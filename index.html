@@ -300,6 +300,9 @@ body{background:var(--bg);font-family:'Segoe UI',Arial,sans-serif;font-size:14px
 
 <!-- SUMMARY -->
 <div id="viewSummary">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <button onclick="buildSummaryTable();showToast('✅ סיכום עודכן')" style="background:rgba(46,117,182,.85);border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">🔄 רענן סיכום</button>
+  </div>
   <div id="summaryWrap">
     <table class="sum-table">
       <thead><tr id="sumHead"></tr></thead>
