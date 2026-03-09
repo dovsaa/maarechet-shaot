@@ -676,6 +676,7 @@ function buildSummaryTable(){const {summary:CS,tLessons:CTL}=computeTeacherData(
   document.getElementById('sumHead').innerHTML=
     '<th>מורה</th>'+GRADE_SHORT.map(g=>`<th>שכבה ${g}</th>`).join('')+'<th>סה"כ</th>';
   const tb=document.getElementById('sumBody');
+  tb.innerHTML='';
   TEACHERS.forEach(teacher=>{
     const tr=document.createElement('tr'); tr.dataset.teacher=teacher;
     let total=0,cells=`<td class="teacher-name-cell" onclick="showTeacherAll('${esc(teacher)}')">${teacher}</td>`;
