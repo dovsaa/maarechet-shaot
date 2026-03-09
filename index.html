@@ -247,6 +247,42 @@ body{background:var(--bg);font-family:'Segoe UI',Arial,sans-serif;font-size:14px
 </div>
 <div id="editOverlay" style="position:fixed;inset:0;z-index:4999;display:none" onclick="closeEditPopup()"></div>
 
+<!-- Add slot popup -->
+<div id="addSlotOverlay" style="position:fixed;inset:0;z-index:5999;background:rgba(0,0,0,.4);display:none" onclick="closeAddSlotPopup()"></div>
+<div id="addSlotPopup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 8px 40px rgba(0,0,0,.25);z-index:6000;min-width:580px;max-width:92vw;max-height:85vh;overflow-y:auto;direction:rtl">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <h4 style="margin:0;color:var(--navy);font-size:15px">➕ הוסף שיעור</h4>
+    <button onclick="closeAddSlotPopup()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888;line-height:1">✕</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;font-weight:600;color:var(--navy)">כיתה:</label>
+      <span id="addSlotClassLabel" style="font-size:12px;color:#555;font-weight:500"></span>
+      <select id="addSlotClassSel" style="font-size:12px;display:none;padding:3px 8px;border-radius:6px;border:1px solid #ccc"></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;font-weight:600;color:var(--navy)">שעה:</label>
+      <input id="addSlotTime" type="text" placeholder="09:00" style="width:72px;font-size:13px;padding:5px 8px;border:1px solid #ccc;border-radius:6px;text-align:center;font-weight:600">
+    </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:var(--vlight);color:var(--navy)">
+        <th style="padding:7px 5px;width:28px"></th>
+        <th style="padding:7px 8px;text-align:right;min-width:90px">יום</th>
+        <th style="padding:7px 4px;text-align:right">סוג שיעור</th>
+        <th style="padding:7px 4px;text-align:right">מקצוע</th>
+        <th style="padding:7px 4px;text-align:right">מורה</th>
+      </tr>
+    </thead>
+    <tbody id="addSlotDaysBody"></tbody>
+  </table>
+  <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+    <button onclick="saveNewSlots()" style="background:var(--accent);border:none;border-radius:8px;color:#fff;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer">✓ שמור שיעורים</button>
+    <button onclick="closeAddSlotPopup()" style="background:#eee;border:none;border-radius:8px;color:#555;padding:8px 16px;font-size:12px;cursor:pointer">ביטול</button>
+  </div>
+</div>
+
 <!-- Lesson add/edit modal -->
 <div id="lessonModal" onclick="if(event.target===this)closeLessonModal()">
   <div class="lesson-modal-box">
@@ -316,6 +352,7 @@ body{background:var(--bg);font-family:'Segoe UI',Arial,sans-serif;font-size:14px
 <div id="viewSchedule" style="display:none">
   <div class="toolbar">
     <button id="editToggleBtn" class="btn-toolbar btn-edit-toggle" onclick="toggleEditMode()">✏️ מצב עריכה</button>
+    <button id="btnAddSlot" class="btn-toolbar" onclick="openAddSlotPopup()" style="display:none;background:rgba(46,160,67,.85);border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">➕ הוסף שיעור</button>
     <span id="overridesCount" class="overrides-count"></span>
     <button class="btn-export" onclick="exportScheduleToExcel()">📥 ייצוא לאקסל</button>
   </div>
@@ -723,6 +760,83 @@ function lessonCard(s){
   return `<div class="detail-lesson"><div class="dl-head">${s.cls} <span class="lesson-tag">${s.d}</span></div><div class="dl-meta">${s.t||''}</div><div class="dl-content">${txt}</div></div>`;
 }
 
+// ── Add slot popup ─────────────────────────────────────────────────
+const _DAYS_ORDER=['יום ראשון','יום שני','יום שלישי','יום רביעי','יום חמישי'];
+function openAddSlotPopup(){
+  const grade=document.getElementById('gradeSelect').value;
+  const classes=getSelectedClasses();
+  if(!classes.length){showToast('בחר כיתה תחילה');return;}
+  const clsSel=document.getElementById('addSlotClassSel');
+  const clsLabel=document.getElementById('addSlotClassLabel');
+  clsSel.innerHTML='';
+  classes.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;clsSel.appendChild(o);});
+  if(classes.length===1){clsSel.style.display='none';clsLabel.textContent=classes[0];clsLabel.style.display='';}
+  else{clsSel.style.display='';clsLabel.style.display='none';}
+  document.getElementById('addSlotTime').value='';
+  const allTeachers=[...new Set([...TEACHERS,...loadCustomTeachers()])].sort((a,b)=>a.localeCompare(b,'he'));
+  const subjects=loadSubjects();
+  const tbody=document.getElementById('addSlotDaysBody');
+  tbody.innerHTML='';
+  _DAYS_ORDER.forEach(day=>{
+    const tr=document.createElement('tr');
+    tr.style.borderBottom='1px solid #f0f0f0';
+    const tdCb=document.createElement('td');tdCb.style.cssText='padding:6px 4px;text-align:center';
+    const cb=document.createElement('input');cb.type='checkbox';cb.className='add-slot-day-cb';cb.dataset.day=day;
+    tdCb.appendChild(cb);tr.appendChild(tdCb);
+    const tdDay=document.createElement('td');tdDay.style.cssText='padding:6px 8px;font-size:12px;font-weight:500;white-space:nowrap';tdDay.textContent=day;tr.appendChild(tdDay);
+    const tdType=document.createElement('td');tdType.style.padding='4px';
+    const selType=document.createElement('select');selType.className='add-slot-type';selType.style.cssText='font-size:11px;width:100%;padding:3px;border-radius:4px;border:1px solid #ddd';
+    [['sync','סינכרוני'],['zoom','זום / Meet'],['live','מפגש חי'],['async','אסינכרוני'],['other','אחר']].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;selType.appendChild(o);});
+    tdType.appendChild(selType);tr.appendChild(tdType);
+    const tdSub=document.createElement('td');tdSub.style.padding='4px';
+    const selSub=document.createElement('select');selSub.className='add-slot-subject';selSub.style.cssText='font-size:11px;width:100%;padding:3px;border-radius:4px;border:1px solid #ddd';
+    const oNoSub=document.createElement('option');oNoSub.value='';oNoSub.textContent='— ללא —';selSub.appendChild(oNoSub);
+    subjects.forEach(s=>{const name=typeof s==='string'?s:s.name;const o=document.createElement('option');o.value=name;o.textContent=name;selSub.appendChild(o);});
+    tdSub.appendChild(selSub);tr.appendChild(tdSub);
+    const tdTch=document.createElement('td');tdTch.style.padding='4px';
+    const selTch=document.createElement('select');selTch.className='add-slot-teacher';selTch.style.cssText='font-size:11px;width:100%;padding:3px;border-radius:4px;border:1px solid #ddd';
+    const oNoTch=document.createElement('option');oNoTch.value='';oNoTch.textContent='— ללא —';selTch.appendChild(oNoTch);
+    allTeachers.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;selTch.appendChild(o);});
+    tdTch.appendChild(selTch);tr.appendChild(tdTch);
+    tbody.appendChild(tr);
+  });
+  document.getElementById('addSlotOverlay').style.display='block';
+  document.getElementById('addSlotPopup').style.display='block';
+}
+function closeAddSlotPopup(){
+  document.getElementById('addSlotOverlay').style.display='none';
+  document.getElementById('addSlotPopup').style.display='none';
+}
+function saveNewSlots(){
+  const grade=document.getElementById('gradeSelect').value;
+  const classes=getSelectedClasses();
+  const clsSel=document.getElementById('addSlotClassSel');
+  const cls=clsSel.style.display!=='none'?clsSel.value:classes[0];
+  const rawTime=document.getElementById('addSlotTime').value.trim();
+  if(!rawTime){showToast('⚠️ יש להזין שעה');return;}
+  if(!/^\d{1,2}:\d{2}$/.test(rawTime)){showToast('⚠️ פורמט שעה לא תקין — לדוגמה: 14:00');return;}
+  const parts=rawTime.split(':');
+  const time=parts[0].padStart(2,'0')+':'+parts[1];
+  let saved=0;
+  document.querySelectorAll('#addSlotDaysBody tr').forEach(tr=>{
+    const cb=tr.querySelector('.add-slot-day-cb');
+    if(!cb||!cb.checked)return;
+    const day=cb.dataset.day;
+    const type=tr.querySelector('.add-slot-type').value;
+    const subject=tr.querySelector('.add-slot-subject').value;
+    const teacher=tr.querySelector('.add-slot-teacher').value;
+    const id='csl_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    saveCustomLesson({id,cls,g:grade,d:day,t:time,c:subject||'שיעור חדש',tr:teacher?[teacher]:[],type});
+    saved++;
+  });
+  if(!saved){showToast('⚠️ יש לסמן לפחות יום אחד');return;}
+  closeAddSlotPopup();
+  schedInit=false;
+  renderScheduleGrid();
+  buildSummaryTable();
+  showToast('✅ נוספו '+saved+' שיעורים');
+}
+
 // ── Overrides (edit mode) ──────────────────────────────────────────
 function loadOverrides(){try{return JSON.parse(localStorage.getItem(LS_OVERRIDES)||'{}');}catch(e){return{};}}
 function saveOverride(k,teacher){const o=loadOverrides();o[k]=teacher;lsSet(LS_OVERRIDES,JSON.stringify(o));updateOverridesCount();}
@@ -739,6 +853,7 @@ function toggleEditMode(){
   const btn=document.getElementById('editToggleBtn');
   btn.classList.toggle('active',editMode);
   btn.textContent=editMode?'✏️ יציאה מעריכה':'✏️ מצב עריכה';
+  document.getElementById('btnAddSlot').style.display=editMode?'':'none';
   renderScheduleGrid();
   if(editMode) showToast('✏️ מצב עריכה פעיל — לחץ על ✏ בשיעור לשינוי מורה');
 }
@@ -1147,7 +1262,8 @@ function openEditPopup(key,currentTeacher,cls,day,time,currentContent,currentTyp
   document.getElementById('editPopupSlotInfo').textContent=`${cls} · ${day} · ${fmtTime(time)}`;
   const sel=document.getElementById('editTeacherSelect');
   sel.innerHTML='<option value="">— ללא מורה —</option>';
-  TEACHERS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
+  const _allTch=[...new Set([...TEACHERS,...loadCustomTeachers()])].sort((a,b)=>a.localeCompare(b,'he'));
+  _allTch.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
   sel.value=currentTeacher||'';
   const editsMap=loadLessonEdits();
   const curSubject=(editsMap[key]&&editsMap[key].c)?editsMap[key].c:(currentContent||'');
