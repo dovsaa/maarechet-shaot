@@ -757,8 +757,6 @@ function computeTeacherData(){
         const key=lkey(s);
         if(deleted.has(key))return;
         const edit=edits[key]||{};
-        const effectiveType=edit.type??s.type;
-        if(effectiveType!=='live')return;
         const effectiveTr=edit.tr??(overrides[key]?[overrides[key]]:s.tr);
         const teacher=(effectiveTr||[])[0]||null;
         if(!teacher)return;
