@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>מערכת שעות – למידה מרחוק</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{--navy:#1F3864;--blue:#2E75B6;--accent:#4472C4;--light:#BDD7EE;--vlight:#D9E1F2;--bg:#F0F4FA;--green:#70ad47;--yellow:#ffc000;--red:#e74c3c;--orange:#f39c12;}
+body{background:var(--bg);font-family:'Segoe UI',Arial,sans-serif;font-size:14px;overflow-x:hidden;}
+#topbar{background:var(--navy);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:1000;flex-wrap:wrap;}
+#topbar h1{font-size:1.1rem;margin:0;white-space:nowrap;}
+#fbStatus{font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(255,255,255,.15);color:#fff;white-space:nowrap;}#fbStatus.online{background:rgba(112,173,71,.35);}#fbStatus.offline{background:rgba(231,76,60,.35);}
+#searchInput{border:none;border-radius:20px;padding:6px 14px;font-size:13px;width:200px;direction:rtl;}
+.main-tabs{background:var(--navy);padding:0 20px;display:flex;gap:4px;border-bottom:3px solid var(--accent);flex-wrap:wrap;}
+.main-tabs button{background:transparent;border:none;color:#aac4e8;padding:8px 16px;cursor:pointer;font-size:13px;border-radius:6px 6px 0 0;transition:.2s;}
+.main-tabs button.active,.main-tabs button:hover{background:var(--accent);color:#fff;}
+#layout{display:flex;height:calc(100vh - 90px);overflow:hidden;}
+#mainPanel{flex:1;overflow-y:auto;padding:16px;}
+#detailPanel{width:0;overflow:hidden;background:#fff;border-right:3px solid var(--accent);transition:width .3s;display:flex;flex-direction:column;}
+#detailPanel.open{width:420px;}
+#detailHeader{background:var(--navy);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+#detailHeader h2{font-size:1rem;margin:0;}
+#detailClose{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;}
+#detailBody{padding:14px;overflow-y:auto;flex:1;}
+/* Summary */
+#summaryWrap{overflow-x:auto;}
+.sum-table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px #0001;}
+.sum-table th{background:var(--navy);color:#fff;padding:10px 12px;text-align:center;font-size:13px;}
+.sum-table th:first-child{text-align:right;}
+.sum-table td{padding:8px 10px;border-bottom:1px solid #e0e8f4;text-align:center;}
+.sum-table td:first-child{text-align:right;font-weight:600;color:var(--navy);}
+.sum-table tr:hover td{background:var(--vlight);}
+.sum-table tr.filtered-out{display:none;}
+.count-cell{cursor:pointer;border-radius:4px;font-weight:600;}
+.count-cell:hover{background:var(--accent)!important;color:#fff;}
+.count-cell.has-val{background:var(--light);}
+.teacher-name-cell{cursor:pointer;}
+.teacher-name-cell:hover{color:var(--accent);text-decoration:underline;}
+.total-col{background:var(--vlight);font-weight:700;}
+.total-row td{background:#dae3f3;font-weight:700;}
+/* Schedule */
+.sched-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
+.sched-controls select{border:1px solid var(--light);border-radius:6px;padding:6px 10px;background:#fff;color:var(--navy);font-size:13px;}
+.sched-grid{overflow-x:auto;}
+.sched-table{border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px #0001;min-width:400px;}
+.sched-table th{background:var(--navy);color:#fff;padding:8px 10px;text-align:center;font-size:12px;}
+.sched-table td{padding:5px 7px;border:1px solid #d0dff0;vertical-align:top;font-size:11.5px;min-width:110px;}
+.sched-table td.time-cell{background:var(--vlight);font-weight:600;color:var(--navy);white-space:nowrap;text-align:center;width:88px;}
+.slot-live{background:#e2f0d9;border-right:3px solid var(--green);border-radius:3px;padding:4px 6px;margin-bottom:3px;position:relative;}
+.slot-zoom{background:#e2f0d9;border-right:3px solid var(--green);border-radius:3px;padding:4px 6px;margin-bottom:3px;position:relative;}
+.slot-sync{background:#fff;border-right:3px solid #bbb;border-radius:3px;padding:4px 6px;margin-bottom:3px;position:relative;}
+.slot-other{background:#f0f0f0;border-right:3px solid #ccc;border-radius:3px;padding:4px 6px;margin-bottom:3px;position:relative;}
+.slot-async{background:#fff2cc;border-right:3px solid var(--yellow);border-radius:3px;padding:4px 6px;margin-bottom:3px;}
+.slot-live.highlight,.slot-zoom.highlight,.slot-sync.highlight,.slot-other.highlight{background:var(--green);color:#fff;}
+.slot-live.overridden,.slot-zoom.overridden,.slot-sync.overridden,.slot-other.overridden{border-right:3px solid var(--orange);background:#fff3e0;}
+.slot-live.conflict-slot,.slot-zoom.conflict-slot,.slot-sync.conflict-slot,.slot-other.conflict-slot{border-right:3px solid var(--red)!important;background:#ffe8e8!important;}
+.slot-text{font-size:11px;line-height:1.4;}
+.slot-teachers{font-size:10.5px;color:#666;margin-top:2px;}
+.slot-teachers span{background:var(--light);border-radius:3px;padding:1px 5px;margin-left:3px;display:inline-block;}
+.slot-teachers span.hl{background:var(--accent);color:#fff;}
+.slot-teachers span.overridden-teacher{background:var(--orange);color:#fff;}
+/* Edit button on slots */
+.edit-btn{position:absolute;top:2px;left:2px;background:var(--orange);border:none;border-radius:3px;color:#fff;font-size:9px;padding:1px 5px;cursor:pointer;opacity:.8;line-height:1.4;}
+.edit-btn:hover{opacity:1;}
+/* Edit popup */
+#editPopup{position:fixed;z-index:5000;background:#fff;border:2px solid var(--accent);border-radius:10px;padding:14px;box-shadow:0 4px 20px #0003;min-width:240px;display:none;}
+#editPopup h4{color:var(--navy);font-size:13px;margin:0 0 10px;}
+#editPopup select{width:100%;border:1px solid var(--light);border-radius:6px;padding:6px 8px;font-size:13px;margin-bottom:10px;}
+.edit-popup-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-ep{border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;}
+.btn-ep-save{background:var(--green);color:#fff;}
+.btn-ep-clear{background:var(--red);color:#fff;}
+.btn-ep-cancel{background:#ddd;color:#333;}
+/* Detail panel */
+.detail-lesson{background:var(--vlight);border-radius:6px;padding:10px 12px;margin-bottom:8px;border-right:4px solid var(--accent);}
+.detail-lesson .dl-head{font-weight:700;color:var(--navy);font-size:13px;}
+.detail-lesson .dl-meta{font-size:12px;color:#555;margin-top:3px;}
+.detail-lesson .dl-content{font-size:12px;margin-top:5px;}
+.lesson-tag{display:inline-block;background:var(--navy);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;margin-right:6px;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;}
+.legend-item{display:flex;align-items:center;gap:5px;}
+.legend-box{width:14px;height:14px;border-radius:3px;}
+.empty-state{color:#aaa;text-align:center;padding:30px;}
+/* Assignment tab */
+.assign-section{background:#fff;border-radius:10px;box-shadow:0 2px 8px #0001;padding:18px;margin-bottom:18px;}
+.assign-section h3{color:var(--navy);font-size:1rem;border-bottom:2px solid var(--accent);padding-bottom:6px;margin-bottom:14px;}
+.cst-table{border-collapse:collapse;width:100%;font-size:13px;}
+.cst-table th{background:var(--navy);color:#fff;padding:7px 10px;text-align:center;}
+.cst-table th:first-child{text-align:right;}
+.cst-table td{padding:6px 8px;border-bottom:1px solid #e8eff8;text-align:center;vertical-align:middle;}
+.cst-table td:first-child{text-align:right;font-weight:600;color:var(--navy);}
+.cst-table tr:hover td{background:var(--vlight);}
+.cst-table input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--red);}
+.cst-table input[type=number]{width:52px;border:1px solid var(--light);border-radius:4px;padding:3px 5px;text-align:center;}
+.balance-row{display:flex;align-items:center;margin-bottom:8px;gap:8px;}
+.balance-label{width:90px;text-align:right;font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.balance-track{flex:1;background:#edf2fa;border-radius:4px;height:22px;position:relative;overflow:visible;}
+.balance-bar{height:100%;border-radius:4px;transition:width .4s;display:flex;align-items:center;padding-left:6px;font-size:11px;color:#fff;font-weight:700;white-space:nowrap;}
+.balance-bar.ok{background:var(--accent);}
+.balance-bar.over{background:var(--red);}
+.balance-bar.under{background:#aaa;}
+.balance-target{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--red);border-radius:2px;z-index:2;}
+.balance-target::after{content:attr(data-label);position:absolute;top:-16px;left:-14px;font-size:9px;color:var(--red);white-space:nowrap;}
+.balance-val{font-size:12px;color:#555;min-width:30px;}
+.gen-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.gen-controls label{font-size:13px;color:var(--navy);font-weight:600;}
+.gen-controls input[type=number]{width:65px;border:1px solid var(--light);border-radius:6px;padding:5px 8px;}
+.btn-gen{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;cursor:pointer;transition:.2s;}
+.btn-gen:hover{background:var(--accent);}
+.btn-save{background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;cursor:pointer;}
+.btn-save:hover{background:#4e8a2c;}
+.result-table{border-collapse:collapse;width:100%;font-size:12px;background:#fff;}
+.result-table th{background:var(--navy);color:#fff;padding:7px 10px;}
+.result-table td{padding:6px 10px;border-bottom:1px solid #e8eff8;vertical-align:top;}
+.result-table tr.changed td{background:#e2f0d9;}
+.result-table tr.violation td{background:#ffe8e8;}
+.badge-changed{background:var(--green);color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;}
+.badge-violation{background:var(--red);color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;}
+.badge-ok{background:#bbb;color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;}
+.compare-bar{display:inline-block;height:10px;border-radius:3px;vertical-align:middle;margin:0 2px;}
+/* Conflicts tab */
+.conflicts-section{background:#fff;border-radius:10px;box-shadow:0 2px 8px #0001;padding:18px;margin-bottom:18px;}
+.conflicts-section h3{color:var(--navy);font-size:1rem;border-bottom:2px solid var(--red);padding-bottom:6px;margin-bottom:14px;}
+.conflict-card{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;margin-bottom:10px;border-right:4px solid var(--red);}
+.conflict-card.dismissed{opacity:.4;border-right-color:#bbb;}
+.conflict-teacher{font-weight:700;color:var(--navy);font-size:14px;}
+.conflict-time{font-size:12px;color:#555;margin:3px 0 8px;}
+.conflict-classes{display:flex;gap:8px;flex-wrap:wrap;}
+.conflict-class-chip{background:var(--vlight);border:1px solid var(--light);border-radius:6px;padding:5px 10px;font-size:12px;}
+.conflict-class-chip.override{background:#fff3e0;border-color:var(--orange);}
+.btn-dismiss{background:transparent;border:1px solid #bbb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;color:#777;margin-top:8px;}
+.btn-goto{background:var(--accent);border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;color:#fff;margin-top:8px;margin-right:6px;}
+.conflict-summary{border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:13px;}
+.conflict-summary.ok{background:#e2f0d9;color:#375623;}
+.conflict-summary.warn{background:#ffe8e8;color:#922;}
+.filter-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+.filter-bar select,.filter-bar input{border:1px solid var(--light);border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;}
+/* Toast */
+.toast-msg{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 24px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
+.toast-msg.show{opacity:1;}
+/* Toolbar */
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.btn-toolbar{border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:.2s;}
+.btn-edit-toggle{background:#fff;border:2px solid var(--orange);color:var(--orange);}
+.btn-edit-toggle.active{background:var(--orange);color:#fff;}
+.btn-reset-overrides{background:#fff;border:2px solid var(--red);color:var(--red);}
+.btn-reset-overrides:hover{background:var(--red);color:#fff;}
+.overrides-count{font-size:12px;color:var(--orange);font-weight:600;}
+/* Teacher sidebar in schedule */
+#schedLayout{display:flex;gap:12px;align-items:flex-start;}
+#teacherSidebar{min-width:165px;max-width:165px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0001;padding:10px;flex-shrink:0;}
+#teacherSidebar h4{color:var(--navy);font-size:12px;font-weight:700;margin:0 0 8px;border-bottom:2px solid var(--accent);padding-bottom:4px;text-align:center;}
+.ts-row{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:4px;font-size:12px;cursor:pointer;gap:5px;}
+.ts-row:hover{background:var(--vlight);}
+.ts-row.ts-hl{background:var(--accent);color:#fff;}
+.ts-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.ts-count{background:var(--light);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;min-width:24px;text-align:center;flex-shrink:0;}
+.ts-row.ts-hl .ts-count{background:#fff;color:var(--navy);}
+/* Class multi-select checkboxes */
+.cls-check-label{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--light);border-radius:5px;padding:3px 9px;font-size:12px;cursor:pointer;transition:.15s;white-space:nowrap;}
+.cls-check-label:hover{border-color:var(--accent);background:var(--vlight);}
+.cls-check-label input{accent-color:var(--accent);}
+.cls-check-label.checked{border-color:var(--accent);background:var(--vlight);font-weight:600;}
+/* Export button */
+.btn-export{background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.btn-export:hover{background:#4e8a2c;}
+/* Teachers management tab */
+.teachers-section{background:#fff;border-radius:10px;box-shadow:0 2px 8px #0001;padding:18px;margin-bottom:18px;}
+.teachers-section h3{color:var(--navy);font-size:1rem;border-bottom:2px solid var(--accent);padding-bottom:6px;margin-bottom:14px;}
+.t-mgmt-table{border-collapse:collapse;width:100%;font-size:13px;}
+.t-mgmt-table th{background:var(--navy);color:#fff;padding:7px 10px;text-align:center;}
+.t-mgmt-table th:first-child{text-align:right;}
+.t-mgmt-table td{padding:6px 8px;border-bottom:1px solid #e8eff8;text-align:center;vertical-align:middle;}
+.t-mgmt-table td:first-child{text-align:right;}
+.t-mgmt-table tr:hover td{background:var(--vlight);}
+.homeroom-cell{display:flex;flex-wrap:wrap;align-items:center;gap:5px;}
+.homeroom-details{display:none;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;}
+.homeroom-details.visible{display:flex;}
+.homeroom-details select{font-size:11px;padding:2px 5px;border:1px solid var(--light);border-radius:4px;color:var(--navy);max-width:110px;}
+.subjects-wrap{display:flex;flex-wrap:wrap;gap:3px;max-width:270px;}
+.subjects-wrap label{font-size:11px;display:flex;align-items:center;gap:2px;cursor:pointer;background:var(--vlight);padding:2px 7px;border-radius:4px;white-space:nowrap;user-select:none;}
+.subjects-wrap label:has(input:checked){background:var(--accent);color:#fff;}
+.subjects-wrap input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;}
+.btn-update-data{background:var(--blue);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;}
+.btn-update-data:hover{background:var(--navy);}
+.t-name-input{border:1px solid var(--light);border-radius:4px;padding:4px 8px;font-size:12px;width:140px;}
+.t-free-select{border:1px solid var(--light);border-radius:4px;padding:4px 8px;font-size:12px;}
+.btn-del{background:var(--red);border:none;border-radius:5px;color:#fff;padding:3px 10px;font-size:11px;cursor:pointer;}
+.btn-add-teacher{background:var(--accent);border:none;border-radius:8px;color:#fff;padding:8px 18px;font-size:13px;cursor:pointer;}
+#btnRefreshAll{background:rgba(46,117,182,.85);border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap;letter-spacing:.3px;}
+#btnRefreshAll:hover{background:var(--navy);}
+/* Lessons tab */
+.lessons-section{background:#fff;border-radius:10px;box-shadow:0 2px 8px #0001;padding:18px;margin-bottom:18px;}
+.lessons-section h3{color:var(--navy);font-size:1rem;border-bottom:2px solid var(--accent);padding-bottom:6px;margin-bottom:14px;}
+.lessons-table{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff;}
+.lessons-table th{background:var(--navy);color:#fff;padding:7px 10px;text-align:right;white-space:nowrap;}
+.lessons-table td{padding:6px 8px;border-bottom:1px solid #e8eff8;vertical-align:middle;}
+.lessons-table tr:hover td{background:var(--vlight);}
+.lessons-table tr.is-custom td{background:#f0f7ff;}
+.lessons-table tr.is-edited td{background:#fffbf0;}
+.btn-lesson-edit{background:var(--blue);border:none;border-radius:5px;color:#fff;padding:3px 9px;font-size:11px;cursor:pointer;margin-left:4px;}
+.btn-lesson-edit:hover{background:var(--navy);}
+.btn-lesson-del{background:var(--red);border:none;border-radius:5px;color:#fff;padding:3px 9px;font-size:11px;cursor:pointer;}
+.btn-lesson-del:hover{opacity:.8;}
+.btn-lesson-add{background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;cursor:pointer;}
+.btn-lesson-add:hover{background:#4e8a2c;}
+/* Lesson modal */
+#lessonModal{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;}
+#lessonModal.open{display:flex;}
+.lesson-modal-box{background:#fff;border-radius:12px;padding:22px;min-width:360px;max-width:500px;width:92%;box-shadow:0 8px 32px #0003;max-height:90vh;overflow-y:auto;}
+.lesson-modal-box h3{color:var(--navy);font-size:1.05rem;margin:0 0 16px;border-bottom:2px solid var(--accent);padding-bottom:8px;}
+.lesson-modal-box label{display:block;font-size:12px;font-weight:600;color:var(--navy);margin-bottom:3px;margin-top:10px;}
+.lesson-modal-box select,.lesson-modal-box input,.lesson-modal-box textarea{width:100%;border:1px solid var(--light);border-radius:6px;padding:7px 10px;font-size:13px;direction:rtl;box-sizing:border-box;}
+.lesson-modal-box textarea{resize:vertical;min-height:70px;}
+.lesson-modal-btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+/* Edit popup wider for content */
+#editPopup{min-width:290px;}
+</style>
+</head>
+<body>
+<div class="toast-msg" id="toast"></div>
+
+<!-- Edit popup (global) -->
+<div id="editPopup">
+  <h4 id="editPopupTitle">עריכת שיעור</h4>
+  <div id="editPopupSlotInfo" style="font-size:11px;color:#666;margin-bottom:8px"></div>
+  <label style="font-size:11px;color:#555;margin-bottom:2px;display:block">מורה:</label>
+  <select id="editTeacherSelect" style="margin-bottom:8px"></select>
+  <label style="font-size:11px;color:#555;margin-bottom:2px;display:block">מקצוע:</label>
+  <select id="editSubjectSelect" onchange="onSubjectSelectChange()" style="margin-bottom:8px;width:100%"></select>
+  <label style="font-size:11px;color:#555;margin-bottom:2px;display:block">סוג שיעור:</label>
+  <select id="editTypeSelect" style="margin-bottom:10px">
+    <option value="sync">סינכרוני</option>
+    <option value="async">אסינכרוני</option>
+    <option value="zoom">ZOOM/MEET</option>
+    <option value="live">מפגש חי (ישן)</option>
+    <option value="other">אחר</option>
+  </select>
+  <div class="edit-popup-btns">
+    <button class="btn-ep btn-ep-save" onclick="applyEdit()">✓ שמור</button>
+    <button class="btn-ep btn-ep-clear" onclick="clearEdit()">↺ בטל שינוי</button>
+    <button class="btn-ep btn-ep-cancel" onclick="closeEditPopup()">✕ סגור</button>
+  </div>
+</div>
+<div id="editOverlay" style="position:fixed;inset:0;z-index:4999;display:none" onclick="closeEditPopup()"></div>
+
+<!-- Lesson add/edit modal -->
+<div id="lessonModal" onclick="if(event.target===this)closeLessonModal()">
+  <div class="lesson-modal-box">
+    <h3 id="lessonModalTitle">הוספת שיעור</h3>
+    <label>שכבה:</label>
+    <select id="lessonModalG" onchange="onLessonModalGradeChange()"></select>
+    <label>כיתה:</label>
+    <select id="lessonModalCls"></select>
+    <label>יום:</label>
+    <select id="lessonModalD">
+      <option>יום ראשון</option><option>יום שני</option><option>יום שלישי</option>
+      <option>יום רביעי</option><option>יום חמישי</option>
+    </select>
+    <label>שעה (לדוג׳ 08:00):</label>
+    <input id="lessonModalT" type="text" placeholder="08:00">
+    <label>תוכן שיעור:</label>
+    <textarea id="lessonModalC" rows="3" placeholder="תיאור השיעור..."></textarea>
+    <label>סוג שיעור:</label>
+    <select id="lessonModalType">
+      <option value="live">מפגש חי</option>
+      <option value="async">אסינכרוני</option>
+      <option value="other">אחר</option>
+    </select>
+    <label>מורה:</label>
+    <select id="lessonModalTeacher"></select>
+    <div class="lesson-modal-btns">
+      <button class="btn-ep btn-ep-save" onclick="saveLessonModal()">✓ שמור שיעור</button>
+      <button class="btn-ep btn-ep-cancel" onclick="closeLessonModal()">✕ סגור</button>
+    </div>
+  </div>
+</div>
+
+<div id="topbar">
+  <h1>&#x1F4CB; מערכת שעות – למידה מרחוק</h1>
+  <input id="searchInput" type="text" placeholder="&#x1F50D; חיפוש מורה..." oninput="filterTeachers(this.value)">
+  <span id="searchCount" style="font-size:12px;opacity:.75"></span>
+  <span id="fbStatus">☁️ מתחבר...</span>
+  <button id="btnRefreshAll" onclick="refreshAllViews()" title="רענן את כל המסכים">🔄 רענן הכל</button>
+</div>
+<div class="main-tabs">
+  <button id="tabSummary"   class="active" onclick="switchTab('summary')">סיכום לפי מורה</button>
+  <button id="tabSchedule"  onclick="switchTab('schedule')">מערכת שעות מלאה</button>
+  <button id="tabAssign"    onclick="switchTab('assign')" style="display:none">⚖️ שיבוץ מאוזן</button>
+  <button id="tabConflicts" onclick="switchTab('conflicts')">⚠️ כפילויות</button>
+  <button id="tabTeachers"  onclick="switchTab('teachers')">👥 ניהול מורים</button>
+  <button id="tabLessons"   onclick="switchTab('lessons')">📚 ניהול מקצועות</button>
+</div>
+
+<div id="layout">
+<div id="mainPanel">
+
+<!-- SUMMARY -->
+<div id="viewSummary">
+  <div id="summaryWrap">
+    <table class="sum-table">
+      <thead><tr id="sumHead"></tr></thead>
+      <tbody id="sumBody"></tbody>
+      <tfoot><tr id="sumFoot" class="total-row"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- SCHEDULE -->
+<div id="viewSchedule" style="display:none">
+  <div class="toolbar">
+    <button id="editToggleBtn" class="btn-toolbar btn-edit-toggle" onclick="toggleEditMode()">✏️ מצב עריכה</button>
+    <span id="overridesCount" class="overrides-count"></span>
+    <button class="btn-export" onclick="exportScheduleToExcel()">📥 ייצוא לאקסל</button>
+  </div>
+  <div class="sched-controls">
+    <label style="font-weight:600;color:var(--navy)">שכבה:</label>
+    <select id="gradeSelect" onchange="onGradeChange()"></select>
+    <label style="font-weight:600;color:var(--navy)">כיתות:</label>
+    <div id="classCheckboxes" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center"></div>
+    <label style="font-weight:600;color:var(--navy)">סינון מורה:</label>
+    <select id="teacherFilterSched" onchange="renderScheduleGrid()">
+      <option value="">— כל המורים —</option>
+    </select>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box" style="background:#e2f0d9;border-right:3px solid #70ad47"></div>מפגש חי</div>
+    <div class="legend-item"><div class="legend-box" style="background:#fff2cc;border-right:3px solid #ffc000"></div>משימה/אסינכרוני</div>
+    <div class="legend-item"><div class="legend-box" style="background:#70ad47"></div>מורה נבחר</div>
+    <div class="legend-item"><div class="legend-box" style="background:#fff3e0;border-right:3px solid #f39c12"></div>שינוי ידני</div>
+    <div class="legend-item"><div class="legend-box" style="background:#ffe8e8;border-right:3px solid #e74c3c"></div>כפילות!</div>
+  </div>
+  <div id="schedLayout">
+    <div class="sched-grid" id="schedGrid" style="flex:1;overflow-x:auto;min-width:0"></div>
+    <div id="teacherSidebar"></div>
+  </div>
+</div>
+
+<!-- ASSIGN -->
+<div id="viewAssign" style="display:none">
+  <div class="assign-section">
+    <h3>🚫 הגדרת חריגים למורים</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:10px">סמן ✓ = המורה <strong>לא זמין/ה</strong> ביום זה. נשמר אוטומטית.</p>
+    <div style="overflow-x:auto">
+      <table class="cst-table">
+        <thead><tr><th>מורה</th><th>ראשון</th><th>שני</th><th>שלישי</th><th>רביעי</th><th>חמישי</th><th>שישי</th><th>מקס/שבוע</th></tr></thead>
+        <tbody id="constraintsBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+      <button class="btn-save" onclick="saveConstraints()">💾 שמור</button>
+      <button class="btn-save" style="background:#e74c3c" onclick="clearConstraints()">🗑️ נקה הכל</button>
+      <span id="cstStatus" style="font-size:12px;color:var(--green)"></span>
+    </div>
+  </div>
+  <div class="assign-section">
+    <h3>📊 מאזן עומס נוכחי</h3>
+    <div id="balanceChart"></div>
+  </div>
+  <div class="assign-section">
+    <h3>✨ הצעת שיבוץ מאוזן</h3>
+    <div class="gen-controls">
+      <label>יעד שיעורים לכל מורה פעיל: <input type="number" id="targetInput" min="1" max="30" placeholder="אוטו"></label>
+      <button class="btn-gen" onclick="generateAssignment()">⚡ צור שיבוץ מאוזן</button>
+    </div>
+    <div id="assignResult"></div>
+  </div>
+</div>
+
+<!-- CONFLICTS -->
+<div id="viewConflicts" style="display:none">
+  <div class="conflicts-section">
+    <h3>⚠️ בדיקת כפילויות — מורה ב-2 כיתות באותו זמן</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">
+      הבדיקה מציגה כל מקרה שבו אותו מורה משובץ ב-2 כיתות שונות <strong>באותו יום ובאותה שעה</strong>.
+      שינויים ידניים (מצב עריכה) נלקחים בחשבון.
+    </p>
+    <div class="filter-bar">
+      <label>סינון לפי מורה:</label>
+      <select id="conflictTeacherFilter" onchange="renderConflicts()">
+        <option value="">— כל המורים —</option>
+      </select>
+      <label>סינון לפי שכבה:</label>
+      <select id="conflictGradeFilter" onchange="renderConflicts()">
+        <option value="">— כל השכבות —</option>
+      </select>
+      <button class="btn-gen" style="padding:6px 16px;font-size:12px" onclick="initConflictsView(true)">🔄 רענן בדיקה</button>
+    </div>
+    <div id="conflictSummary"></div>
+    <div id="conflictsList"></div>
+  </div>
+</div>
+
+<!-- TEACHERS MANAGEMENT -->
+<div id="viewTeachers" style="display:none">
+  <div class="teachers-section">
+    <h3>👥 ניהול רשימת המורים</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:12px">ניתן לעדכן שמות מורים, להוסיף מורים חדשים, להסיר מורים, ולהגדיר יום חופשי לכל מורה.</p>
+    <div style="overflow-x:auto">
+      <table class="t-mgmt-table">
+        <thead><tr><th>שם מורה</th><th>יום חופשי</th><th>מחנכת + כיתה</th><th>מקצועות</th><th>פעולה</th></tr></thead>
+        <tbody id="teacherMgmtBody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+      <button class="btn-add-teacher" onclick="addNewTeacherRow()">+ הוסף מורה</button>
+      <button class="btn-update-data" onclick="updateData()">🔄 עדכן נתונים</button>
+      <button class="btn-save" style="background:#e74c3c" onclick="resetTeacherConfig()">🔄 איפוס לברירת מחדל</button>
+      <span id="teacherMgmtStatus" style="font-size:12px;color:var(--green)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- SUBJECTS MANAGEMENT -->
+<div id="viewLessons" style="display:none">
+  <div class="lessons-section">
+    <h3>📚 ניהול מקצועות</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">הגדר מקצועות וסוג שיעור. בעת עריכת שיעור במערכת השעות תוכל לבחור מקצוע מהרשימה — הסוג יתמלא אוטומטית.</p>
+    <!-- Add / Edit form -->
+    <div style="display:flex;gap:8px;margin-bottom:6px;align-items:flex-end;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#555">מקצוע:</label>
+        <input id="newSubjectInput" type="text" placeholder="שם המקצוע..."
+               onkeydown="if(event.key==='Enter')addSubjectRow()"
+               style="border:1px solid var(--light);border-radius:6px;padding:6px 10px;font-size:13px;direction:rtl;width:200px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#555">סוג שיעור:</label>
+        <select id="newSubjectType" style="border:1px solid var(--light);border-radius:6px;padding:6px 10px;font-size:13px">
+          <option value="sync">סינכרוני</option>
+          <option value="async">אסינכרוני</option>
+          <option value="zoom">ZOOM/MEET</option>
+          <option value="other">אחר</option>
+        </select>
+      </div>
+      <button id="subjectAddBtn" class="btn-lesson-add" onclick="addSubjectRow()" style="align-self:flex-end">+ הוסף מקצוע</button>
+      <button id="subjectCancelBtn" class="btn-gen" onclick="cancelSubjectEdit()"
+              style="display:none;padding:6px 14px;font-size:12px;align-self:flex-end">✕ ביטול</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <span id="subjectsCount" style="font-size:12px;color:#666"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="lessons-table">
+        <thead>
+          <tr><th>שם מקצוע</th><th>סוג שיעור</th><th style="width:150px">פעולות</th></tr>
+        </thead>
+        <tbody id="subjectsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /mainPanel -->
+
+<!-- Detail panel -->
+<div id="detailPanel">
+  <div id="detailHeader">
+    <h2 id="detailTitle">פרטי מורה</h2>
+    <button id="detailClose" onclick="closeDetail()">✕</button>
+  </div>
+  <div id="detailBody"></div>
+</div>
+</div><!-- /layout -->
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   🔧 הגדרות Firebase — מלאו את הפרטים לאחר יצירת הפרויקט
+   הוראות מלאות: ראו FIREBASE_SETUP.md
+   ════════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyAfumkexqSZKFU8UQfdVEWrUPD4EQMseKw",
+  authDomain:        "lea-goldberg.firebaseapp.com",
+  databaseURL:       "https://lea-goldberg-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "lea-goldberg",
+  storageBucket:     "lea-goldberg.firebasestorage.app",
+  messagingSenderId: "828466731549",
+  appId:             "1:828466731549:web:c215d66d9e2ca1a8a804f4"
+};
+const FB_ROOM = "school-schedule"; // שנו לשם ייחודי לבית הספר שלכם
+const RESET_PASSWORD = "1403"; // ← שנו לסיסמה שלכם
+/* ════════════════════════════════════════════════════════════════ */
+
+const DATA = {"grades":["שכבת א","שכבת ב","שכבת ג","שכבת ד","שכבת ה","שכבת ו"],"gradeShort":["א","ב","ג","ד","ה","ו"],"teachers":["לימור","מעין ד","רבקה","טניה","מיטל ג","דנה","ורד","יפעת","מיטל ש","יהודית","מעין ש","בתאל","שירז","אלינור","נטלי","כנרת","אוראל","גלית","דניאל","הודיה","מיטל ב","נופר","ענת","רונית","רעיה","שירה","שרון"],"summary":{"לימור":{"שכבת א":12},"מיטל ב":{"שכבת א":1,"שכבת ב":1,"שכבת ה":2,"שכבת ו":8},"רונית":{"שכבת א":3,"שכבת ב":2,"שכבת ג":1,"שכבת ו":1},"הודיה":{"שכבת א":2,"שכבת ג":2},"מעין ד":{"שכבת א":8,"שכבת ג":2},"רבקה":{"שכבת א":13},"דנה":{"שכבת א":3,"שכבת ב":11,"שכבת ד":1},"טניה":{"שכבת ב":12},"ענת":{"שכבת ב":1,"שכבת ד":1},"מיטל ג":{"שכבת ב":13,"שכבת ג":1},"שרון":{"שכבת ב":1,"שכבת ג":1,"שכבת ד":2,"שכבת ה":6,"שכבת ו":4},"ורד":{"שכבת ג":8},"רעיה":{"שכבת ג":4,"שכבת ה":4},"יפעת":{"שכבת ג":7,"שכבת ד":2},"דניאל":{"שכבת ג":2,"שכבת ד":1,"שכבת ה":2,"שכבת ו":1},"מיטל ש":{"שכבת ד":13},"יהודית":{"שכבת ד":5,"שכבת ו":3},"שירז":{"שכבת ד":3,"שכבת ה":7},"מעין ש":{"שכבת ד":7},"כנרת":{"שכבת ד":2,"שכבת ו":7},"אלינור":{"שכבת ד":1,"שכבת ה":7,"שכבת ו":1},"בתאל":{"שכבת ה":11},"נטלי":{"שכבת ה":8,"שכבת ו":3},"גלית":{"שכבת ה":3,"שכבת ו":3},"נופר":{"שכבת ה":2,"שכבת ו":3},"שירה":{"שכבת ה":4,"שכבת ו":8},"אוראל":{"שכבת ו":3}},"tLessons":{"לימור":{"שכבת א":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"}]},"מיטל ב":{"שכבת א":[{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- מיטל שחף","tr":["מיטל ב"],"cls":"כיתה א1","g":"שכבת א","type":"live"}],"שכבת ב":[{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- מיטל","tr":["מיטל ב"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"}],"שכבת ה":[{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom אנגלית מיטל","tr":["מיטל ב"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית ה2 מיטל","tr":["מיטל ב"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"רונית":{"שכבת א":[{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום עברית רונית עם כיתה א2+א1","tr":["רונית"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom פתיחת יום שיח - רונית עם כיתה א1+א2","tr":["רונית"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom  - חנ\"ג רונית","tr":["רונית"],"cls":"כיתה א3","g":"שכבת א","type":"live"}],"שכבת ב":[{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom  - רונית חנ\"ג","tr":["רונית"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית-  רונית חנ\"ג","tr":["רונית"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"}],"שכבת ג":[{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג רונית","tr":["רונית"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"}],"שכבת ו":[{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג רונית","tr":["רונית"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"הודיה":{"שכבת א":[{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום הודיה אומנות","tr":["הודיה"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום - הודיה","tr":["הודיה"],"cls":"כיתה א3","g":"שכבת א","type":"live"}],"שכבת ג":[{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom  הודיה אומנות","tr":["הודיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom אומנות הודיה","tr":["הודיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}]},"מעין ד":{"שכבת א":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מעין ד","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מעין ד","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א3","g":"שכבת א","type":"live"}],"שכבת ג":[{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מעין ד","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שני","c":"מפגש meet / zoom עברית מעין ד","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}]},"רבקה":{"שכבת א":[{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - רבקה","tr":["רבקה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom  - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom  - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom  - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom  - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"}]},"דנה":{"שכבת א":[{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום - דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום - דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"}],"שכבת ב":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom חנ\"ג - דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום עברית דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום חשבון מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף שבוע מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"}],"שכבת ד":[{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום דנה אומנות","tr":["דנה"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"}]},"טניה":{"שכבת ב":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom עברית - מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יוםחשבון  טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף שבוע טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יוםמחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"}]},"ענת":{"שכבת ב":[{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom ענת אנגלית משחוק","tr":["ענת"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"}],"שכבת ד":[{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom ענת  אנגלית","tr":["ענת"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"}]},"מיטל ג":{"שכבת ב":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom  עברית  מיטל ג'רבי","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"}],"שכבת ג":[{"t":"12:00-12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי- מיטל ג'רבי","tr":["מיטל ג"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"}]},"שרון":{"שכבת ב":[{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom חנ\"ג - שרון לוטן","tr":["שרון"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"}],"שכבת ג":[{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג שרון לוטן","tr":["שרון"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}],"שכבת ד":[{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom  חנ\"ג שרון לוטן","tr":["שרון"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}],"שכבת ה":[{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom שרון חנ\"ג +ה4","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom שרון חנ\"ג +ה3","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom חנ\"ג שרון + כיתה ה1","tr":["שרון"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom שרון חנ\"ג + ה1","tr":["שרון"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"ורד":{"שכבת ג":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שני","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"}]},"רעיה":{"שכבת ג":[{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom רעיה","tr":["רעיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום חמישי","c":"מפגש meet / zoom רעיה","tr":["רעיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}],"שכבת ה":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע רעיה","tr":["רעיה"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}]},"יפעת":{"שכבת ג":[{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה - יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה- מחנכת יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom  מתמטיקה- יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום ראשון","c":"מפגש meet / zoom יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}],"שכבת ד":[{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}]},"דניאל":{"שכבת ג":[{"t":"12:00-12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה- מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"}],"שכבת ד":[{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי מוזיקה דניאל +ד2","tr":["דניאל"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}],"שכבת ה":[{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"מיטל ש":{"שכבת ד":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"}]},"יהודית":{"שכבת ד":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom יהודית מדעים","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"}],"שכבת ו":[{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"}]},"שירז":{"שכבת ד":[{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom  שירז עברית","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"}],"שכבת ה":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom שירז גאוגרפיה","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"}]},"מעין ש":{"שכבת ד":[{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מדעים מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום שני","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}]},"כנרת":{"שכבת ד":[{"t":"10:00-10:45 אסניכרוני","d":"יום ראשון","c":"מפגש meet / zoom כנרת עברית","tr":["כנרת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom סוף יום עברית כנרת","tr":["כנרת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom תנ\"ך כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom תנ\"ך כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom כנרת עברית","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom עברית כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom גאוגרפיה כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"}]},"אלינור":{"שכבת ד":[{"t":"10:00-10:45 אסניכרוני","d":"יום חמישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"}],"שכבת ה":[{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom גאוגרפיה אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom אלינור עברית","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מדעים אלינור","tr":["אלינור"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"בתאל":{"שכבת ה":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom פתיחת יום עם בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom עברית בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה  בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה  בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים בתאל","tr":["בתאל"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}]},"נטלי":{"שכבת ה":[{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom גאוגרפיה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom נטלי מתמטיקה","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה נטלי","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"גלית":{"שכבת ה":[{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom  מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"}]},"נופר":{"שכבת ה":[{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom נופר","tr":["נופר"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom נופר עברית","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]},"שירה":{"שכבת ה":[{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"}],"שכבת ו":[{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom תנ\"ך שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom  שירה תנ\"ך","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"}]},"אוראל":{"שכבת ו":[{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אוראל כישורי חיים","tr":["אוראל"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי אוראל","tr":["אוראל"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom כישורי חיים אוראל","tr":["אוראל"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"}]}},"schedule":{"שכבת א":{"כיתה א1":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- מיטל שחף","tr":["מיטל ב"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום עברית רונית עם כיתה א2+א1","tr":["רונית"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום עברית מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום הודיה אומנות","tr":["הודיה"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת  מולדת/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה א1","g":"שכבת א","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום  - מחנכת לימור ויעל","tr":["לימור"],"cls":"כיתה א1","g":"שכבת א","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]},"כיתה א2":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מעין ד","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מעין","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - רבקה","tr":["רבקה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מעיין ד","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom פתיחת יום שיח - רונית עם כיתה א1+א2","tr":["רונית"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מעין ד","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום מעין שטרן","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  חשבון / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  חשבון / פעילות הפוגה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה: משחק","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה א2","g":"שכבת א","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום - דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום - דנה","tr":["דנה"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א2","g":"שכבת א","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]},"כיתה א3":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom  - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מעין דבסטני","tr":["מעין ד"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom  - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom  - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom  - חנ\"ג רונית","tr":["רונית"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom  - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  חשבון / פעילות הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: משחק","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  חשבון / פעילות הפוגה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה: משחק","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה א3","g":"שכבת א","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סיכום יום - הודיה","tr":["הודיה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סיכום יום - רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סיכום יום - מחנכת רבקה","tr":["רבקה"],"cls":"כיתה א3","g":"שכבת א","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]}},"שכבת ב":{"כיתה ב1":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom עברית - מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom ענת אנגלית משחוק","tr":["ענת"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom  - רונית חנ\"ג","tr":["רונית"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יוםחשבון  טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום חשבון אינה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף שבוע טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב1","g":"שכבת ב","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יוםמחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום  מחנכת טניה","tr":["טניה"],"cls":"כיתה ב1","g":"שכבת ב","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]},"כיתה ב2":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom חנ\"ג - שרון לוטן","tr":["שרון"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- מיטל","tr":["מיטל ב"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom  עברית  מיטל ג'רבי","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום חשבון מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת  / פעילות-משחק הפוגה/יצירה","tr":[],"cls":"כיתה ב2","g":"שכבת ב","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף יום מחנכת מיטל","tr":["מיטל ג"],"cls":"כיתה ב2","g":"שכבת ב","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]},"כיתה ב3":{"slots":[{"t":"08:30:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שני","c":"מפגש meet / zoom חנ\"ג - דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום שלישי","c":"מפגש meet / zoom עברית-  רונית חנ\"ג","tr":["רונית"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"08:30:00","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- אינה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"09:15:00","d":"יום ראשון","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שני","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום שלישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום רביעי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"09:15:00","d":"יום חמישי","c":"משימה מתוקשבת  עברית / פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"10:00:00","d":"יום ראשון","c":"מפגש meet / zoom סוף יום חשבון מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שני","c":"מפגש meet / zoom סוף יום עברית דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום שלישי","c":"מפגש meet / zoom סוף יום חשבון דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום רביעי","c":"מפגש meet / zoom סוף יום חשבון מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"10:00:00","d":"יום חמישי","c":"מפגש meet / zoom סוף שבוע מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"11:00:00","d":"יום ראשון","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שני","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום שלישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום רביעי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"11:00:00","d":"יום חמישי","c":"משימה מתוקשבת  / פעילות-משחק הפוגה/יצירה","tr":[],"cls":"כיתה ב3","g":"שכבת ב","type":"async"},{"t":"12:00:00","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום רביעי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"},{"t":"12:00:00","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת דנה","tr":["דנה"],"cls":"כיתה ב3","g":"שכבת ב","type":"live"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["08:30:00","09:15:00","10:00:00","11:00:00","12:00:00"]}},"שכבת ג":{"כיתה ג1":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג רונית","tr":["רונית"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom  הודיה אומנות","tr":["הודיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom רעיה","tr":["רעיה"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"11:00 אסינכרוני","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה עברית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"12:00-12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שני","c":"מפגש meet / zoom עברית- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה- מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה- מחנכת ורד","tr":["ורד"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי- מיטל ג'רבי","tr":["מיטל ג"],"cls":"כיתה ג1","g":"שכבת ג","type":"live"},{"t":"13:00 - 13:30","d":"יום ראשון","c":"משימה מתוקשבת אנגלית","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום שני","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום שלישי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום רביעי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום חמישי","c":"משימה מתוקשבת  / פעילות-משחק הפוגה/יצירה","tr":[],"cls":"כיתה ג1","g":"שכבת ג","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 אסינכרוני","12:00-12:45","13:00 - 13:30"]},"כיתה ג2":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת יום שיח - מחנכת יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה - יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה- מחנכת יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom רחלי","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom  מתמטיקה- יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom אומנות הודיה","tr":["הודיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג שרון לוטן","tr":["שרון"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom עברית- מעין ד","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom  מפגש סיכום שבוע- יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"11:00 אסינכרוני","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה עברית","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"11:00 אסינכרוני","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"12:00-12:45","d":"יום ראשון","c":"מפגש meet / zoom יפעת","tr":["יפעת"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שני","c":"מפגש meet / zoom עברית מעין ד","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה- מדעים יאיר","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"12:00-12:45","d":"יום חמישי","c":"מפגש meet / zoom רעיה","tr":["רעיה"],"cls":"כיתה ג2","g":"שכבת ג","type":"live"},{"t":"13:00 - 13:30","d":"יום ראשון","c":"משימה מתוקשבת  עברית מעין ד/ פעילות-משחק הפוגה","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום שני","c":"משימה מתוקשבת  עברית מעין ד/ פעילות-משחק הפוגה","tr":["מעין ד"],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום שלישי","c":"משימה מתוקשבת  אנגלית/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום רביעי","c":"משימה מתוקשבת  מתמטיקה/ פעילות-משחק הפוגה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"},{"t":"13:00 - 13:30","d":"יום חמישי","c":"משימה מתוקשבת  / פעילות-משחק הפוגה/יצירה","tr":[],"cls":"כיתה ג2","g":"שכבת ג","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 אסינכרוני","12:00-12:45","13:00 - 13:30"]}},"שכבת ד":{"כיתה ד1 - חנ\"מ":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מדעיםמיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom ענת  אנגלית","tr":["ענת"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מדעים","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom עברית מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom נועם מעברי","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom מיטל ש","tr":["מיטל ש"],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ד1 - חנ\"מ","g":"שכבת ד","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ד2":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מעין שטרן","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom נועם","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom יהודית מדעים","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום דנה אומנות","tr":["דנה"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom  שירז עברית","tr":["שירז"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי מוזיקה + ד3","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ד2","g":"שכבת ד","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ד3":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מדעים מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom  חנ\"ג שרון לוטן","tr":["שרון"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom פתיחת יום מחנכת מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום ראשון","c":"מפגש meet / zoom כנרת עברית","tr":["כנרת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום שני","c":"מפגש meet / zoom אנגלית מעין ש","tr":["מעין ש"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום שלישי","c":"מפגש meet / zoom מעין שטרן","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום רביעי","c":"מפגש meet / zoom מעין שטרן","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"10:00-10:45 אסניכרוני","d":"יום חמישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / אנגלית/מדעים","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מדעים","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom מעיין ש","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יפעת","tr":["יפעת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom סוף יום עברית כנרת","tr":["כנרת"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי מוזיקה דניאל +ד2","tr":["דניאל"],"cls":"כיתה ד3","g":"שכבת ד","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ד3","g":"שכבת ד","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00-10:45 אסניכרוני","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]}},"שכבת ה":{"כיתה ה1":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom פתיחת יום עם בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom עברית בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom עברית בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom שרון חנ\"ג +ה4","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים יאיר","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מדעים יאיר","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom שרון חנ\"ג +ה3","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה  בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה  בתאל סיגל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom בתאל","tr":["בתאל"],"cls":"כיתה ה1","g":"שכבת ה","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה1","g":"שכבת ה","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ה2":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom שירז גאוגרפיה","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom אנגלית מיטל","tr":["מיטל ב"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom עברית שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים יאיר","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: גאוגרפיה","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אנגלית ה2 מיטל","tr":["מיטל ב"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי שירז","tr":["שירז"],"cls":"כיתה ה2","g":"שכבת ה","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה2","g":"שכבת ה","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ה3":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע רעיה","tr":["רעיה"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom גאוגרפיה אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom נופר","tr":["נופר"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom חנ\"ג שרון + כיתה ה1","tr":["שרון"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom אלינור עברית","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom מתמטיקה אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי אלינור","tr":["אלינור"],"cls":"כיתה ה3","g":"שכבת ה","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / גאוגרפיה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה3","g":"שכבת ה","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ה4":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom גאוגרפיה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom שרון חנ\"ג + ה1","tr":["שרון"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom מדעים בתאל","tr":["בתאל"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom  נועם","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / גאוגרפיה","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה עברית","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom סוף יום אנגלית רעיה","tr":["רעיה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ה4","g":"שכבת ה","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / מדעים","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ה4","g":"שכבת ה","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]}},"שכבת ו":{"כיתה ו1":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom תנ\"ך שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות עברית","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom  מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom  שירה עברית","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom  שירה תנ\"ך","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"מפגש meet / zoom עברית שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / פעילות עברית","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית/תנ\"ך","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom מתמטיקה גלית","tr":["גלית"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom אוראל כישורי חיים","tr":["אוראל"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי שירה","tr":["שירה"],"cls":"כיתה ו1","g":"שכבת ו","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / גאוגרפיה","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ו1","g":"שכבת ו","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ו2":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom תנ\"ך כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom תנ\"ך כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom כנרת עברית","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom עברית כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom גאוגרפיה כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom עברית כנרת","tr":["כנרת"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג שרון","tr":["שרון"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מתמטיקה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה יהודית","tr":["יהודית"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי אוראל","tr":["אוראל"],"cls":"כיתה ו2","g":"שכבת ו","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / גאוגרפיה","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ו2","g":"שכבת ו","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]},"כיתה ו3":{"slots":[{"t":"09:00-09:45","d":"יום ראשון","c":"מפגש meet / zoom פתיחת שבוע אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שני","c":"מפגש meet / zoom אנגלית מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום שלישי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום רביעי","c":"מפגש meet / zoom עברית נופר","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"09:00-09:45","d":"יום חמישי","c":"מפגש meet / zoom שרון שכבתי מסיבת סיום","tr":["שרון"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום ראשון","c":"מפגש meet / zoom כישורי חיים אוראל","tr":["אוראל"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שני","c":"מפגש meet / zoom מדעים אלינור","tr":["אלינור"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום שלישי","c":"מפגש meet / zoom נטלי מתמטיקה","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום רביעי","c":"מפגש meet / zoom גאומטריה נטלי","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"10:00 - 10:45","d":"יום חמישי","c":"מפגש meet / zoom מוסיקה דניאל","tr":["דניאל"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"11:00 - 11:45","d":"יום ראשון","c":"משימה מתוקשבת / גאוגרפיה","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום שני","c":"משימה מתוקשבת / מדעים","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום שלישי","c":"משימה מתוקשבת / מתמטיקה","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום רביעי","c":"משימה מתוקשבת / פעילות הפוגה מתמטיקה","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"11:00 - 11:45","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: אנגלית","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"12:00 - 12:45","d":"יום ראשון","c":"מפגש meet / zoom מתמטיקה נטלי","tr":["נטלי"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שני","c":"מפגש meet / zoom חנ\"ג רונית","tr":["רונית"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום שלישי","c":"מפגש meet / zoom מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום רביעי","c":"מפגש meet / zoom נופר עברית","tr":["נופר"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"12:00 - 12:45","d":"יום חמישי","c":"מפגש meet / zoom סיכום שבועי מיטל ב","tr":["מיטל ב"],"cls":"כיתה ו3","g":"שכבת ו","type":"live"},{"t":"13:00-13:30","d":"יום ראשון","c":"משימה מתוקשבת / פעילות הפוגה: מתמטיקה","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שני","c":"משימה מתוקשבת / אנגלית","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום שלישי","c":"משימה מתוקשבת / פעילות הפוגה: עברית","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום רביעי","c":"משימה מתוקשבת / עברית","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"},{"t":"13:00-13:30","d":"יום חמישי","c":"משימה מתוקשבת / פעילות הפוגה: משחק / יצירה","tr":[],"cls":"כיתה ו3","g":"שכבת ו","type":"async"}],"days":["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי"],"times":["09:00-09:45","10:00 - 10:45","11:00 - 11:45","12:00 - 12:45","13:00-13:30"]}}}};
+const GRADES=DATA.grades, GRADE_SHORT=DATA.gradeShort, TEACHERS=DATA.teachers;
+const SUMMARY=DATA.summary, T_LESSONS=DATA.tLessons, SCHEDULE=DATA.schedule;
+const GRADE_CLASSES={};
+GRADES.forEach(g=>{GRADE_CLASSES[g]=Object.keys(SCHEDULE[g]||{});});
+
+function applyRenames(){
+  const renames=JSON.parse(localStorage.getItem('teacherRenames_v1')||'{}');
+  if(!Object.keys(renames).length) return;
+  Object.entries(renames).forEach(([orig,curr])=>{
+    const idx=DATA.teachers.indexOf(orig);
+    if(idx>-1) DATA.teachers[idx]=curr;
+    GRADES.forEach(g=>{Object.values(SCHEDULE[g]).forEach(cd=>{
+      cd.slots.forEach(s=>{s.tr=s.tr.map(t=>t===orig?curr:t);});
+    });});
+  });
+}
+applyRenames();
+
+// ── Firebase sync ──────────────────────────────────────────────────
+let fbDb=null;
+let _fbSyncing=false;
+let _fbBatchTimer=null;
+let _hasPendingWrite=false; // true from lsSet/lsRemove until Firebase write resolves
+let _localSeq=parseInt(localStorage.getItem('_localSeq')||'0');
+const FB_KEYS=['schedConstraints_v1','schedOverrides_v1','schedDismissed_v1',
+               'teacherConfig_v1','customTeachers_v1','teacherExt_v1','teacherRenames_v1',
+               'schedLessonEdits_v1','schedCustomLessons_v1','schedDeletedLessons_v1',
+               'schedSubjects_v1'];
+const FB_BATCH_DELAY=400;
+
+function lsSet(key,value){
+  localStorage.setItem(key,value);
+  _localSeq++;
+  localStorage.setItem('_localSeq',String(_localSeq));
+  _hasPendingWrite=true;
+  localStorage.setItem('_pendingWriteSeq',String(_localSeq));
+  _scheduleFbBatch();
+}
+function lsRemove(key){
+  localStorage.removeItem(key);
+  _localSeq++;
+  localStorage.setItem('_localSeq',String(_localSeq));
+  _hasPendingWrite=true;
+  localStorage.setItem('_pendingWriteSeq',String(_localSeq));
+  _scheduleFbBatch();
+}
+function _scheduleFbBatch(){
+  if(!fbDb) return;
+  if(_fbBatchTimer) clearTimeout(_fbBatchTimer);
+  _fbBatchTimer=setTimeout(_batchWriteToFb,FB_BATCH_DELAY);
+}
+function _batchWriteToFb(){
+  if(_fbBatchTimer){clearTimeout(_fbBatchTimer);_fbBatchTimer=null;}
+  if(!fbDb||_fbSyncing) return;
+  const data={_seq:_localSeq};
+  FB_KEYS.forEach(key=>{
+    const v=localStorage.getItem(key);
+    if(v) try{data[key]=JSON.parse(v);}catch(e){}
+  });
+  fbDb.ref(FB_ROOM).set(data)
+    .then(()=>{_hasPendingWrite=false;localStorage.removeItem('_pendingWriteSeq');})
+    .catch(e=>{console.warn('FB batch write:',e);_hasPendingWrite=false;localStorage.removeItem('_pendingWriteSeq');});
+}
+
+
+function refreshAll(){
+  buildSummaryTable();
+  schedInit=false;
+  renderScheduleGrid();
+  teachersMgmtInit=false;
+  if(document.getElementById('viewTeachers').style.display!=='none') initTeachersView();
+  if(document.getElementById('viewAssign').style.display!=='none'){buildConstraintsTable();renderBalanceChart();}
+  if(document.getElementById('viewConflicts').style.display!=='none') initConflictsView(true);
+  if(typeof lessonsInit!=='undefined'&&lessonsInit&&document.getElementById('viewLessons').style.display!=='none') renderSubjectsTable();
+  showToast('🔄 הנתונים עודכנו ממורה אחר');
+}
+function refreshAllViews(){
+  // Force-reset all init flags and rebuild every view
+  teachersMgmtInit=false;
+  schedInit=false;
+  buildSummaryTable();
+  renderScheduleGrid();
+  initConflictsView(true);
+  if(document.getElementById('viewTeachers').style.display!=='none') initTeachersView();
+  if(typeof lessonsInit!=='undefined'){lessonsInit=false;if(document.getElementById('viewLessons').style.display!=='none'){lessonsInit=true;renderSubjectsTable();}}
+  showToast('🔄 כל המסכים עודכנו');
+}
+
+function initFirebase(){
+  if(FIREBASE_CONFIG.apiKey==='YOUR_API_KEY'){
+    document.getElementById('fbStatus').textContent='⚠️ Firebase לא מוגדר';
+    return;
+  }
+  try{
+    const app=firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb=firebase.database(app);
+    const statusEl=document.getElementById('fbStatus');
+    // Connection indicator
+    fbDb.ref('.info/connected').on('value',snap=>{
+      const on=snap.val();
+      statusEl.textContent=on?'🟢 מחובר לענן':'🔴 מנותק';
+      statusEl.className=on?'online':'offline';
+    });
+    // Real-time listener — fires when ANY user changes data
+    fbDb.ref(FB_ROOM).on('value',snap=>{
+      const data=snap.val()||{};
+      const fbSeq=data._seq||0;
+      // If we have uncommitted local changes in flight, don't let Firebase overwrite them
+      if(_hasPendingWrite||_fbBatchTimer!==null) return;
+      _fbSyncing=true;
+      let changed=false;
+      let renamesChanged=false;
+      try{
+        FB_KEYS.forEach(key=>{
+          const fbVal=data[key]!==undefined?JSON.stringify(data[key]):null;
+          const lsVal=localStorage.getItem(key);
+          // Normalize for comparison
+          const fbNorm=fbVal?JSON.stringify(JSON.parse(fbVal)):null;
+          const lsNorm=lsVal?JSON.stringify(JSON.parse(lsVal)):null;
+          if(fbNorm!==lsNorm){
+            if(fbVal) localStorage.setItem(key,fbVal);
+            else localStorage.removeItem(key);
+            changed=true;
+            if(key==='teacherRenames_v1') renamesChanged=true;
+          }
+        });
+        // Sync local seq to Firebase seq
+        _localSeq=fbSeq;
+        localStorage.setItem('_localSeq',String(_localSeq));
+      }finally{
+        _fbSyncing=false;
+      }
+      if(renamesChanged){window.location.reload();return;}
+      if(changed) refreshAll();
+    });
+    // First load: if Firebase empty, push current localStorage
+    fbDb.ref(FB_ROOM).once('value',snap=>{
+      if(!snap.val()){
+        const data={_seq:_localSeq};
+        FB_KEYS.forEach(key=>{
+          const v=localStorage.getItem(key);
+          if(v) try{data[key]=JSON.parse(v);}catch(e){}
+        });
+        if(Object.keys(data).length>1) fbDb.ref(FB_ROOM).set(data);
+      }
+    });
+    // Recover from interrupted write: if page reloaded before Firebase write completed,
+    // localStorage has newer data than Firebase — push it before accepting any incoming updates
+    if(localStorage.getItem('_pendingWriteSeq')!==null){
+      _hasPendingWrite=true;
+      _scheduleFbBatch();
+    }
+  }catch(e){
+    console.warn('Firebase error:',e);
+    document.getElementById('fbStatus').textContent='❌ שגיאת Firebase';
+  }
+}
+initFirebase();
+// Flush pending batch write before page unload (best-effort)
+window.addEventListener('beforeunload',()=>{
+  if(_fbBatchTimer){clearTimeout(_fbBatchTimer);_batchWriteToFb();}
+});
+
+const DAYS_HEB=['יום ראשון','יום שני','יום שלישי','יום רביעי','יום חמישי','יום שישי'];
+const LS_CONSTRAINTS='schedConstraints_v1';
+const LS_OVERRIDES='schedOverrides_v1';
+const LS_DISMISSED='schedDismissed_v1';
+const LS_LESSON_EDITS='schedLessonEdits_v1';
+const LS_CUSTOM_LESSONS='schedCustomLessons_v1';
+const LS_DELETED_LESSONS='schedDeletedLessons_v1';
+const LS_SUBJECTS='schedSubjects_v1';
+
+// ── Tab switching ──────────────────────────────────────────────────
+function switchTab(tab){
+  ['summary','schedule','assign','conflicts','teachers','lessons'].forEach(t=>{
+    document.getElementById('view'+cap(t)).style.display=t===tab?'':'none';
+    document.getElementById('tab'+cap(t)).classList.toggle('active',t===tab);
+  });
+  if(tab==='schedule')  initScheduleView();
+  if(tab==='assign')    initAssignView();
+  if(tab==='conflicts') initConflictsView();
+  if(tab==='teachers')  initTeachersView();
+  if(tab==='lessons')   initSubjectsView();
+}
+function cap(s){return s[0].toUpperCase()+s.slice(1);}
+
+// ── Summary ────────────────────────────────────────────────────────
+function buildSummaryTable(){const {summary:CS,tLessons:CTL}=computeTeacherData();
+  document.getElementById('sumHead').innerHTML=
+    '<th>מורה</th>'+GRADE_SHORT.map(g=>`<th>שכבה ${g}</th>`).join('')+'<th>סה"כ</th>';
+  const tb=document.getElementById('sumBody');
+  TEACHERS.forEach(teacher=>{
+    const tr=document.createElement('tr'); tr.dataset.teacher=teacher;
+    let total=0,cells=`<td class="teacher-name-cell" onclick="showTeacherAll('${esc(teacher)}')">${teacher}</td>`;
+    GRADES.forEach((grade,gi)=>{
+      const cnt=(CS[teacher]||{})[grade]||0; total+=cnt;
+      cells+=cnt>0?`<td class="count-cell has-val" style="background:hsl(${200+gi*15},55%,${85-cnt*3}%)" onclick="showTeacherGrade('${esc(teacher)}','${esc(grade)}')" title="${teacher} – שכבת ${GRADE_SHORT[gi]}: ${cnt}">${cnt}</td>`:'<td class="count-cell">–</td>';
+    });
+    cells+=`<td class="total-col">${total}</td>`;
+    tr.innerHTML=cells; tb.appendChild(tr);
+  });
+  let ftotal=0,fc='<td>סה"כ</td>';
+  GRADES.forEach(grade=>{const s=TEACHERS.reduce((a,t)=>a+((CS[t]||{})[grade]||0),0);ftotal+=s;fc+=`<td>${s}</td>`;});
+  document.getElementById('sumFoot').innerHTML=fc+`<td>${ftotal}</td>`;
+}
+function filterTeachers(q){
+  let vis=0;
+  document.querySelectorAll('#sumBody tr').forEach(r=>{const show=!q||r.dataset.teacher.includes(q);r.classList.toggle('filtered-out',!show);if(show)vis++;});
+  document.getElementById('searchCount').textContent=q?`(${vis} מורים)`:'';
+}
+
+// ── Detail panel ───────────────────────────────────────────────────
+function openDetail(title,html){document.getElementById('detailTitle').textContent=title;document.getElementById('detailBody').innerHTML=html;document.getElementById('detailPanel').classList.add('open');}
+function closeDetail(){document.getElementById('detailPanel').classList.remove('open');}
+function showTeacherAll(teacher){
+  const {tLessons:CTL}=computeTeacherData();
+  const lessons=CTL[teacher]||{};let html='',total=0;
+  GRADES.forEach(grade=>{const ls=lessons[grade];if(!ls?.length)return;total+=ls.length;
+    html+=`<div style="margin-bottom:14px"><div style="font-weight:700;color:var(--navy);border-bottom:2px solid var(--accent);padding-bottom:4px;margin-bottom:8px">${grade} — ${ls.length} שיעורים</div>`;
+    ls.forEach(s=>{html+=lessonCard(s);}); html+='</div>';});
+  openDetail(`${teacher} · ${total} שיעורים`,html||'<div class="empty-state">לא נמצאו</div>');
+}
+function showTeacherGrade(teacher,grade){
+  const {tLessons:CTL}=computeTeacherData();
+  const ls=(CTL[teacher]||{})[grade]||[];
+  let html=`<div style="font-size:12px;color:#666;margin-bottom:10px">${ls.length} שיעורים ב${grade}</div>`;
+  ls.forEach(s=>{html+=lessonCard(s);});
+  openDetail(`${teacher} · ${grade}`,html||'<div class="empty-state">לא נמצאו</div>');
+}
+function lessonCard(s){
+  const txt=s.c.replace(/מפגש meet \/ zoom\s*/,'').replace(/מפגש meet\/zoom\s*/,'');
+  return `<div class="detail-lesson"><div class="dl-head">${s.cls} <span class="lesson-tag">${s.d}</span></div><div class="dl-meta">${s.t||''}</div><div class="dl-content">${txt}</div></div>`;
+}
+
+// ── Overrides (edit mode) ──────────────────────────────────────────
+function loadOverrides(){try{return JSON.parse(localStorage.getItem(LS_OVERRIDES)||'{}');}catch(e){return{};}}
+function saveOverride(k,teacher){const o=loadOverrides();o[k]=teacher;lsSet(LS_OVERRIDES,JSON.stringify(o));updateOverridesCount();}
+function clearOverride(k){const o=loadOverrides();delete o[k];lsSet(LS_OVERRIDES,JSON.stringify(o));updateOverridesCount();}
+function resetAllOverrides(){if(!confirm('לבטל את כל השינויים הידניים?'))return;lsRemove(LS_OVERRIDES);updateOverridesCount();renderScheduleGrid();showToast('🗑️ כל השינויים אופסו');}
+function updateOverridesCount(){const n=Object.keys(loadOverrides()).length;document.getElementById('overridesCount').textContent=n?`${n} שינויים ידניים פעילים`:'';}
+
+let editMode=false;
+let currentEditKey=null;
+let conflictKeys=new Set();
+
+function toggleEditMode(){
+  editMode=!editMode;
+  const btn=document.getElementById('editToggleBtn');
+  btn.classList.toggle('active',editMode);
+  btn.textContent=editMode?'✏️ יציאה מעריכה':'✏️ מצב עריכה';
+  renderScheduleGrid();
+  if(editMode) showToast('✏️ מצב עריכה פעיל — לחץ על ✏ בשיעור לשינוי מורה');
+}
+
+function lkey(l){return `${l.g}|${l.cls}|${l.d}|${l.t}|${l.c.substring(0,25)}`;}
+
+function computeTeacherData(){
+  const overrides=loadOverrides();
+  const edits=loadLessonEdits();
+  const deleted=loadDeletedLessons();
+  const customs=loadCustomLessons();
+  const summary={};const tLessons={};
+  GRADES.forEach(grade=>{
+    Object.entries(SCHEDULE[grade]||{}).forEach(([cls,cd])=>{
+      (cd.slots||[]).forEach(s=>{
+        const key=lkey(s);
+        if(deleted.has(key))return;
+        const edit=edits[key]||{};
+        const effectiveType=edit.type??s.type;
+        if(effectiveType!=='live')return;
+        const effectiveTr=edit.tr??(overrides[key]?[overrides[key]]:s.tr);
+        const teacher=(effectiveTr||[])[0]||null;
+        if(!teacher)return;
+        if(!summary[teacher])summary[teacher]={};
+        summary[teacher][grade]=(summary[teacher][grade]||0)+1;
+        if(!tLessons[teacher])tLessons[teacher]={};
+        if(!tLessons[teacher][grade])tLessons[teacher][grade]=[];
+        tLessons[teacher][grade].push({t:s.t,d:s.d,c:edit.c??s.c,cls,g:grade});
+      });
+    });
+  });
+  customs.filter(l=>l.type==='live').forEach(l=>{
+    const teacher=(l.tr||[])[0]||null;if(!teacher)return;
+    if(!summary[teacher])summary[teacher]={};
+    summary[teacher][l.g]=(summary[teacher][l.g]||0)+1;
+    if(!tLessons[teacher])tLessons[teacher]={};
+    if(!tLessons[teacher][l.g])tLessons[teacher][l.g]=[];
+    tLessons[teacher][l.g].push({t:l.t,d:l.d,c:l.c,cls:l.cls,g:l.g});
+  });
+  return {summary,tLessons};
+}
+
+// ── Schedule view ──────────────────────────────────────────────────
+let schedInit=false;
+function initScheduleView(){
+  if(schedInit)return; schedInit=true;
+  const gs=document.getElementById('gradeSelect');
+  GRADES.forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;gs.appendChild(o);});
+  const tf=document.getElementById('teacherFilterSched');
+  TEACHERS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tf.appendChild(o);});
+  updateOverridesCount();
+  onGradeChange();
+}
+function onGradeChange(){
+  const grade=document.getElementById('gradeSelect').value;
+  const container=document.getElementById('classCheckboxes');
+  container.innerHTML='';
+  const classes=Object.keys(SCHEDULE[grade]||{});
+  classes.forEach((c,i)=>{
+    const id=`clscb_${i}`;
+    const label=document.createElement('label');
+    label.className='cls-check-label'+(i===0?' checked':'');
+    label.htmlFor=id;
+    const cb=document.createElement('input');
+    cb.type='checkbox'; cb.id=id; cb.value=c; cb.checked=(i===0);
+    cb.addEventListener('change',()=>{label.classList.toggle('checked',cb.checked);renderScheduleGrid();});
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' '+c));
+    container.appendChild(label);
+  });
+  renderScheduleGrid();
+}
+function getSelectedClasses(){
+  return [...document.querySelectorAll('#classCheckboxes input[type=checkbox]:checked')].map(cb=>cb.value);
+}
+
+function renderScheduleGrid(){
+  const grade=document.getElementById('gradeSelect').value;
+  const selectedClasses=getSelectedClasses();
+  const filterT=document.getElementById('teacherFilterSched').value;
+  const grid=document.getElementById('schedGrid');
+  const overrides=loadOverrides();
+  if(!selectedClasses.length){
+    grid.innerHTML='<div class="empty-state">אנא בחר לפחות כיתה אחת</div>';
+    renderTeacherSidebar([],overrides,filterT);
+    return;
+  }
+  let html='';
+  const classDataArr=[];
+  selectedClasses.forEach(cls=>{
+    const cd=(SCHEDULE[grade]||{})[cls];
+    if(!cd?.slots?.length){html+=`<div class="empty-state">אין נתונים עבור ${cls}</div>`;return;}
+    classDataArr.push(cd);
+    if(selectedClasses.length>1) html+=`<div style="font-weight:700;color:var(--navy);font-size:13px;margin:10px 0 5px;padding:5px 10px;background:var(--vlight);border-radius:6px;border-right:4px solid var(--accent)">${cls}</div>`;
+    html+=buildClassGrid(cd,overrides,filterT,cls);
+  });
+  grid.innerHTML=html;
+  renderTeacherSidebar(classDataArr,overrides,filterT);
+}
+
+function buildClassGrid(cd,overrides,filterT,cls){
+  const edits=loadLessonEdits();
+  const deleted=loadDeletedLessons();
+  const customs=loadCustomLessons();
+  // Build effective slots list (base - deleted + edits + customs for this class)
+  const clsName=cls||(cd.slots?.[0]?.cls||'');
+  const baseSlots=(cd.slots||[]).filter(s=>!deleted.has(lkey(s)));
+  const customSlots=customs.filter(l=>l.cls===clsName).map(l=>({...l,isCustom:true}));
+  const allSlots=[...baseSlots,...customSlots];
+  // Derive days and times from effective set
+  const dayOrder={'יום ראשון':1,'יום שני':2,'יום שלישי':3,'יום רביעי':4,'יום חמישי':5,'יום שישי':6};
+  const effectiveDays=cd.days.filter(d=>baseSlots.some(s=>s.d===d));
+  customSlots.forEach(l=>{if(!effectiveDays.includes(l.d))effectiveDays.push(l.d);});
+  effectiveDays.sort((a,b)=>(dayOrder[a]||9)-(dayOrder[b]||9));
+  const timesSet=new Set([...cd.times,...customSlots.map(l=>l.t)].filter(Boolean));
+  const effectiveTimes=[...timesSet].sort((a,b)=>a<b?-1:a>b?1:0);
+  const map={};
+  effectiveTimes.forEach(t=>{map[t]={};effectiveDays.forEach(d=>{map[t][d]=[];});});
+  allSlots.forEach(s=>{if(s.t&&map[s.t]&&map[s.t][s.d]!==undefined)map[s.t][s.d].push(s);});
+  let html='<div style="overflow-x:auto;margin-bottom:14px"><table class="sched-table"><thead><tr><th>שעה</th>'+effectiveDays.map(d=>`<th>${d}</th>`).join('')+'</tr></thead><tbody>';
+  effectiveTimes.forEach(time=>{
+    html+='<tr><td class="time-cell">'+fmtTime(time)+'</td>';
+    effectiveDays.forEach(day=>{
+      const ss=(map[time]||{})[day]||[];
+      html+='<td>';
+      ss.forEach(s=>{
+        const key=s.isCustom?('custom:'+s.id):lkey(s);
+        const edit=s.isCustom?{}:(edits[key]||{});
+        const effectiveC=edit.c??s.c;
+        const effectiveType=edit.type??s.type;
+        const origT=(s.tr||[])[0]||'';
+        const effectiveT=(edit.tr?.[0])||(overrides[key]||origT);
+        const txt=effectiveC.replace(/מפגש meet \/ zoom\s*/g,'').replace(/מפגש meet\/zoom\s*/g,'').trim();
+        if(effectiveType==='async'){
+          html+=`<div class="slot-async"><div class="slot-text">${txt}</div></div>`;return;
+        }
+        // Determine CSS class by type (live/zoom=green, sync=white, other=gray)
+        const slotCls=effectiveType==='zoom'?'slot-zoom':effectiveType==='sync'?'slot-sync':effectiveType==='other'?'slot-other':'slot-live';
+        const isConflict=conflictKeys.has(key);
+        const hl=filterT&&effectiveT===filterT?' highlight':'';
+        const conflClass=isConflict?' conflict-slot':'';
+        const teacherLabel=`<span class="${filterT&&effectiveT===filterT?'hl':''}">${effectiveT}</span>`;
+        const editBtn=editMode?`<button class="edit-btn" onclick="openEditPopup('${esc(key)}','${esc(effectiveT)}','${esc(s.cls)}','${esc(s.d)}','${esc(s.t)}','${esc(effectiveC)}','${esc(effectiveType)}',event)" title="ערוך שיעור">✏</button>`:'';
+        html+=`<div class="${slotCls}${hl}${conflClass}">${editBtn}<div class="slot-text">${txt}</div><div class="slot-teachers">${teacherLabel}</div></div>`;
+      });
+      html+='</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
+function renderTeacherSidebar(classDataArr,overrides,filterT){
+  const sidebar=document.getElementById('teacherSidebar');
+  if(!sidebar) return;
+  const teacherCount={};
+  classDataArr.forEach(cd=>{
+    if(!cd?.slots) return;
+    cd.slots.filter(s=>s.type==='live').forEach(s=>{
+      const key=lkey(s);
+      const t=overrides[key]||(s.tr[0]||'');
+      if(t) teacherCount[t]=(teacherCount[t]||0)+1;
+    });
+  });
+  const sorted=Object.entries(teacherCount).sort((a,b)=>b[1]-a[1]);
+  let html='<h4>מורים בתצוגה</h4>';
+  if(!sorted.length){
+    html+='<div style="font-size:11px;color:#aaa;padding:10px;text-align:center">אין נתונים</div>';
+  } else {
+    sorted.forEach(([t,cnt])=>{
+      const hl=filterT===t;
+      html+=`<div class="ts-row${hl?' ts-hl':''}" onclick="filterByTeacher('${esc(t)}')" title="${t}"><span class="ts-name">${t}</span><span class="ts-count">${cnt}</span></div>`;
+    });
+  }
+  sidebar.innerHTML=html;
+}
+
+function filterByTeacher(teacher){
+  const tf=document.getElementById('teacherFilterSched');
+  tf.value=tf.value===teacher?'':teacher;
+  renderScheduleGrid();
+}
+
+function fmtTime(t){return t.replace(/אסינכרוני|אסנכרוני|אסניכרוני/g,"אסינ'");}
+
+// ── Export to Excel ────────────────────────────────────────────────
+function exportScheduleToExcel(){
+  if(typeof XLSX==='undefined'){showToast('⚠️ ספריית Excel לא נטענה, נסה לרענן');return;}
+  const grade=document.getElementById('gradeSelect').value;
+  const selectedClasses=getSelectedClasses();
+  const overrides=loadOverrides();
+  if(!selectedClasses.length){showToast('אנא בחר לפחות כיתה אחת');return;}
+  const wb=XLSX.utils.book_new();
+  selectedClasses.forEach(cls=>{
+    const cd=(SCHEDULE[grade]||{})[cls];
+    if(!cd?.slots?.length) return;
+    const {slots,days,times}=cd;
+    const map={};
+    times.forEach(t=>{map[t]={};days.forEach(d=>{map[t][d]=[];});});
+    slots.forEach(s=>{if(s.t&&map[s.t]&&map[s.t][s.d]!==undefined)map[s.t][s.d].push(s);});
+    const header=['שעה',...days];
+    const rows=[header];
+    times.forEach(time=>{
+      const row=[fmtTime(time)];
+      days.forEach(day=>{
+        const ss=(map[time]||{})[day]||[];
+        const cell=ss.map(s=>{
+          if(s.type==='async') return '[אסינ] '+s.c.replace(/מפגש meet \/ zoom\s*/,'').replace(/מפגש meet\/zoom\s*/,'').trim();
+          if(s.type!=='live') return '';
+          const key=lkey(s);
+          const effectiveT=overrides[key]||(s.tr[0]||'');
+          const txt=s.c.replace(/מפגש meet \/ zoom\s*/,'').replace(/מפגש meet\/zoom\s*/,'').trim();
+          return txt+(effectiveT?' ['+effectiveT+']':'');
+        }).filter(Boolean).join('\n');
+        row.push(cell);
+      });
+      rows.push(row);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:14},...days.map(()=>({wch:30}))];
+    XLSX.utils.book_append_sheet(wb,ws,cls.replace(/[:\\\/\?\*\[\]]/g,'').substring(0,30));
+  });
+  // Summary sheet
+  const summaryRows=[['מורה',...GRADE_SHORT.map(g=>'שכבה '+g),'סה"כ']];
+  const {summary:CSE}=computeTeacherData();
+  TEACHERS.forEach(teacher=>{
+    const counts=GRADES.map(g=>(CSE[teacher]||{})[g]||0);
+    const total=counts.reduce((a,b)=>a+b,0);
+    if(total>0) summaryRows.push([teacher,...counts,total]);
+  });
+  const wsSummary=XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols']=[{wch:16},...GRADE_SHORT.map(()=>({wch:10})),{wch:10}];
+  XLSX.utils.book_append_sheet(wb,wsSummary,'סיכום מורים');
+  XLSX.writeFile(wb,`מערכת_שעות_${grade.replace('שכבת','שכ')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('📥 הקובץ הורד בהצלחה');
+}
+
+// ── Teachers Management ────────────────────────────────────────────
+const LS_TEACHER_CONFIG='teacherConfig_v1';
+const LS_CUSTOM_TEACHERS='customTeachers_v1';
+const LS_TEACHER_EXT='teacherExt_v1';
+const SUBJECTS_LIST=['עברית','מתמטיקה','חשבון','אנגלית','מדעים','גאוגרפיה','תנ"ך','אומנות','מוסיקה','מוזיקה','גאומטריה','כישורי חיים','נפתח הלב','ספורט'];
+function loadTeacherExt(){try{return JSON.parse(localStorage.getItem(LS_TEACHER_EXT)||'{}');}catch(e){return{};}}
+const DAYS_FREE_OPTS=['ללא יום חופשי','יום ראשון','יום שני','יום שלישי','יום רביעי','יום חמישי','יום שישי'];
+
+function loadTeacherConfig(){try{return JSON.parse(localStorage.getItem(LS_TEACHER_CONFIG)||'{}');}catch(e){return{};}}
+function loadCustomTeachers(){try{return JSON.parse(localStorage.getItem(LS_CUSTOM_TEACHERS)||'[]');}catch(e){return[];}}
+function getAllManagedTeachers(){return[...new Set([...DATA.teachers,...loadCustomTeachers()])];}
+
+let teachersMgmtInit=false;
+function initTeachersView(){
+  if(teachersMgmtInit)return; teachersMgmtInit=true;
+  buildTeacherMgmtTable();
+}
+
+function buildTeacherMgmtTable(){
+  const config=loadTeacherConfig();
+  const ext=loadTeacherExt();
+  const customTeachers=loadCustomTeachers();
+  const allT=getAllManagedTeachers();
+  const tb=document.getElementById('teacherMgmtBody'); tb.innerHTML='';
+  allT.forEach((teacher,i)=>{
+    const tc=config[teacher]||{};
+    const te=ext[teacher]||{};
+    const freeDay=tc.freeDay||'ללא יום חופשי';
+    const isCustom=customTeachers.includes(teacher);
+    const isHomeroom=te.isHomeroom||false;
+    const hGrade=te.homeroomGrade||'';
+    const hClass=te.homeroomClass||'';
+    const tSubjects=te.subjects||[];
+    const tr=document.createElement('tr');
+    tr.dataset.origName=teacher; tr.dataset.isCustom=isCustom?'1':'0';
+    const dayOpts=DAYS_FREE_OPTS.map(d=>`<option value="${d}"${freeDay===d?' selected':''}>${d}</option>`).join('');
+    const gradeOpts=GRADES.map(g=>`<option value="${g}"${hGrade===g?' selected':''}>${g}</option>`).join('');
+    const initGrade=hGrade||GRADES[0];
+    const classOpts=(GRADE_CLASSES[initGrade]||[]).map(c=>`<option value="${c}"${hClass===c?' selected':''}>${c}</option>`).join('');
+    const subjHtml=SUBJECTS_LIST.map(s=>`<label><input type="checkbox" value="${s}"${tSubjects.includes(s)?' checked':''}> ${s}</label>`).join('');
+    tr.innerHTML=`<td><input class="t-name-input" type="text" value="${teacher}"></td>`
+      +`<td><select class="t-free-select">${dayOpts}</select></td>`
+      +`<td><div class="homeroom-cell">`
+      +`<label><input type="checkbox" class="homeroom-cb"${isHomeroom?' checked':''}> מחנכת</label>`
+      +`<div class="homeroom-details${isHomeroom?' visible':''}">`
+      +`<select class="homeroom-grade" onchange="updateClassOpts(this)">${gradeOpts}</select>`
+      +`<select class="homeroom-class">${classOpts}</select>`
+      +`</div></div></td>`
+      +`<td><div class="subjects-wrap">${subjHtml}</div></td>`
+      +`<td><button class="btn-del" onclick="removeTeacherRow(this)">✕ הסר</button></td>`;
+    tr.querySelector('.homeroom-cb').addEventListener('change',function(){
+      this.closest('.homeroom-cell').querySelector('.homeroom-details').classList.toggle('visible',this.checked);
+    });
+    tb.appendChild(tr);
+  });
+}
+
+function updateClassOpts(gradeSelect){
+  const grade=gradeSelect.value;
+  const classSelect=gradeSelect.closest('.homeroom-details').querySelector('.homeroom-class');
+  classSelect.innerHTML=(GRADE_CLASSES[grade]||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+function addNewTeacherRow(){
+  const tb=document.getElementById('teacherMgmtBody');
+  const tr=document.createElement('tr');
+  tr.dataset.origName=''; tr.dataset.isCustom='1';
+  const dayOpts=DAYS_FREE_OPTS.map(d=>`<option value="${d}">${d}</option>`).join('');
+  const gradeOpts=GRADES.map(g=>`<option value="${g}">${g}</option>`).join('');
+  const classOpts=(GRADE_CLASSES[GRADES[0]]||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+  const subjHtml=SUBJECTS_LIST.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join('');
+  tr.innerHTML=`<td><input class="t-name-input" type="text" placeholder="שם מורה חדש"></td>`
+    +`<td><select class="t-free-select">${dayOpts}</select></td>`
+    +`<td><div class="homeroom-cell">`
+    +`<label><input type="checkbox" class="homeroom-cb"> מחנכת</label>`
+    +`<div class="homeroom-details">`
+    +`<select class="homeroom-grade" onchange="updateClassOpts(this)">${gradeOpts}</select>`
+    +`<select class="homeroom-class">${classOpts}</select>`
+    +`</div></div></td>`
+    +`<td><div class="subjects-wrap">${subjHtml}</div></td>`
+    +`<td><button class="btn-del" onclick="removeTeacherRow(this)">✕ הסר</button></td>`;
+  tr.querySelector('.homeroom-cb').addEventListener('change',function(){
+    this.closest('.homeroom-cell').querySelector('.homeroom-details').classList.toggle('visible',this.checked);
+  });
+  tb.appendChild(tr);
+  tr.querySelector('input[type=text]').focus();
+}
+
+function removeTeacherRow(btn){btn.closest('tr').remove();}
+
+function _collectTeacherData(){
+  const config={};const newCustom=[];const ext={};
+  document.querySelectorAll('#teacherMgmtBody tr').forEach(tr=>{
+    const nameInput=tr.querySelector('input[type=text]');
+    if(!nameInput) return;
+    const name=nameInput.value.trim();
+    if(!name) return;
+    const freeSelect=tr.querySelector('select.t-free-select');
+    const freeDay=freeSelect?freeSelect.value:'ללא יום חופשי';
+    config[name]={freeDay,origName:tr.dataset.origName||name};
+    if(tr.dataset.isCustom==='1'||!DATA.teachers.includes(name)) newCustom.push(name);
+    const homeroomCb=tr.querySelector('.homeroom-cb');
+    const isHomeroom=homeroomCb?homeroomCb.checked:false;
+    const hGradeEl=tr.querySelector('.homeroom-grade');
+    const hClassEl=tr.querySelector('.homeroom-class');
+    const subjects=[...tr.querySelectorAll('.subjects-wrap input:checked')].map(i=>i.value);
+    ext[name]={isHomeroom,homeroomGrade:isHomeroom&&hGradeEl?hGradeEl.value:'',homeroomClass:isHomeroom&&hClassEl?hClassEl.value:'',subjects};
+  });
+  return {config,newCustom,ext};
+}
+
+
+function updateData(){
+  const {config,newCustom,ext}=_collectTeacherData();
+  const renames=JSON.parse(localStorage.getItem('teacherRenames_v1')||'{}');
+  document.querySelectorAll('#teacherMgmtBody tr').forEach(tr=>{
+    const nameInput=tr.querySelector('input[type=text]');
+    if(!nameInput) return;
+    const name=nameInput.value.trim();
+    const origName=tr.dataset.origName||name;
+    if(origName&&origName!==name){
+      // find root (original DATA) name for this teacher
+      const rootName=Object.keys(renames).find(k=>renames[k]===origName)||origName;
+      if(rootName!==name) renames[rootName]=name;
+      else delete renames[rootName];
+      GRADES.forEach(g=>{Object.values(SCHEDULE[g]).forEach(cd=>{
+        cd.slots.forEach(s=>{s.tr=s.tr.map(t=>t===origName?name:t);});
+      });});
+      const idx=DATA.teachers.indexOf(origName);
+      if(idx>-1) DATA.teachers[idx]=name;
+      tr.dataset.origName=name;
+    }
+  });
+  lsSet('teacherRenames_v1',JSON.stringify(renames));
+  lsSet(LS_TEACHER_CONFIG,JSON.stringify(config));
+  lsSet(LS_CUSTOM_TEACHERS,JSON.stringify(newCustom));
+  lsSet(LS_TEACHER_EXT,JSON.stringify(ext));
+  teachersMgmtInit=false;
+  schedInit=false;
+  initTeachersView();
+  buildSummaryTable();
+  renderScheduleGrid();
+  showToast('✅ הנתונים עודכנו בכל המערכת');
+  document.getElementById('teacherMgmtStatus').textContent='עודכן ✓';
+  setTimeout(()=>{document.getElementById('teacherMgmtStatus').textContent='';},3000);
+}
+
+function resetTeacherConfig(){
+  const pw=prompt('הזינו סיסמת מנהל לאיפוס:');
+  if(pw===null) return;
+  if(pw!==RESET_PASSWORD){alert('סיסמה שגויה');return;}
+  if(!confirm('לאפס את כל הגדרות המורים לברירת המחדל? פעולה זו בלתי הפיכה!')) return;
+  lsRemove(LS_TEACHER_CONFIG);
+  lsRemove(LS_CUSTOM_TEACHERS);
+  teachersMgmtInit=false;
+  initTeachersView();
+  showToast('🔄 אופס לברירת מחדל');
+}
+
+// ── Edit popup ─────────────────────────────────────────────────────
+function openEditPopup(key,currentTeacher,cls,day,time,currentContent,currentType,event){
+  // Support both old 6-arg and new 8-arg call signatures
+  if(typeof currentContent==='object'&&currentContent!==null&&!Array.isArray(currentContent)){
+    event=currentContent;currentContent='';currentType='live';
+  }
+  if(typeof currentType==='object'&&currentType!==null){event=currentType;currentType='live';}
+  event.stopPropagation();
+  currentEditKey=key;
+  document.getElementById('editPopupTitle').textContent='עריכת שיעור';
+  document.getElementById('editPopupSlotInfo').textContent=`${cls} · ${day} · ${fmtTime(time)}`;
+  const sel=document.getElementById('editTeacherSelect');
+  sel.innerHTML='<option value="">— ללא מורה —</option>';
+  TEACHERS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
+  sel.value=currentTeacher||'';
+  const editsMap=loadLessonEdits();
+  const curSubject=(editsMap[key]&&editsMap[key].c)?editsMap[key].c:(currentContent||'');
+  const subSel=document.getElementById('editSubjectSelect');
+  subSel.innerHTML='<option value="" data-type="">— ללא מקצוע —</option>';
+  loadSubjects().forEach(s=>{
+    const name=typeof s==='string'?s:s.name;
+    const stype=typeof s==='string'?'sync':(s.type||'sync');
+    const label=SUBJECT_TYPE_LABEL[stype]||stype;
+    const o=document.createElement('option');
+    o.value=name;o.dataset.type=stype;
+    o.textContent=`${name} (${label})`;
+    subSel.appendChild(o);
+  });
+  subSel.value=curSubject;
+  const ts=document.getElementById('editTypeSelect');
+  // Auto-fill type from subject if subject is selected; otherwise use slot's current type
+  if(curSubject) onSubjectSelectChange();
+  else if(ts) ts.value=currentType||'sync';
+  const popup=document.getElementById('editPopup');
+  popup.style.display='block';
+  document.getElementById('editOverlay').style.display='block';
+  const x=event.clientX, y=event.clientY;
+  const pw=popup.offsetWidth||300, ph=popup.offsetHeight||240;
+  popup.style.top=Math.min(y+10, window.innerHeight-ph-10)+'px';
+  popup.style.right=Math.max(10, window.innerWidth-x-10)+'px';
+  popup.style.left='auto';
+}
+function applyEdit(){
+  if(!currentEditKey) return;
+  const t=document.getElementById('editTeacherSelect').value;
+  const newSubject=document.getElementById('editSubjectSelect').value||null;
+  const newType=(document.getElementById('editTypeSelect')||{}).value||null;
+  saveOverride(currentEditKey,t);
+  // Also save subject/type edits if changed
+  const edits={};
+  if(newSubject&&newSubject.trim()) edits.c=newSubject.trim();
+  if(newType) edits.type=newType;
+  if(Object.keys(edits).length) saveLessonEdit(currentEditKey,edits);
+  closeEditPopup();
+  renderScheduleGrid();
+  buildSummaryTable();
+  showToast(`✅ שובץ: ${t}`);
+}
+function clearEdit(){
+  if(!currentEditKey) return;
+  clearOverride(currentEditKey);
+  clearLessonEdit(currentEditKey);
+  closeEditPopup();
+  renderScheduleGrid();
+  buildSummaryTable();
+  showToast('↺ שינוי בוטל');
+}
+function closeEditPopup(){
+  document.getElementById('editPopup').style.display='none';
+  document.getElementById('editOverlay').style.display='none';
+  currentEditKey=null;
+}
+function onSubjectSelectChange(){
+  const sel=document.getElementById('editSubjectSelect');
+  const opt=sel.options[sel.selectedIndex];
+  if(opt&&opt.dataset.type){
+    document.getElementById('editTypeSelect').value=opt.dataset.type;
+  }
+}
+
+// ── Lesson edit helpers ─────────────────────────────────────────────
+function loadLessonEdits(){try{return JSON.parse(localStorage.getItem(LS_LESSON_EDITS)||'{}');}catch(e){return{};}}
+function loadCustomLessons(){try{return JSON.parse(localStorage.getItem(LS_CUSTOM_LESSONS)||'[]');}catch(e){return[];}}
+function loadDeletedLessons(){try{return new Set(JSON.parse(localStorage.getItem(LS_DELETED_LESSONS)||'[]'));}catch(e){return new Set();}}
+function saveLessonEdit(key,fields){const e=loadLessonEdits();e[key]={...(e[key]||{}),...fields};lsSet(LS_LESSON_EDITS,JSON.stringify(e));}
+function clearLessonEdit(key){const e=loadLessonEdits();delete e[key];lsSet(LS_LESSON_EDITS,JSON.stringify(e));}
+function saveCustomLesson(l){const ls=loadCustomLessons();const i=ls.findIndex(x=>x.id===l.id);if(i>=0)ls[i]=l;else ls.push(l);lsSet(LS_CUSTOM_LESSONS,JSON.stringify(ls));}
+function deleteCustomLesson(id){lsSet(LS_CUSTOM_LESSONS,JSON.stringify(loadCustomLessons().filter(l=>l.id!==id)));}
+function markSlotDeleted(key){const d=loadDeletedLessons();d.add(key);lsSet(LS_DELETED_LESSONS,JSON.stringify([...d]));}
+function resetAllLessonEdits(){if(!confirm('לאפס את כל עריכות השיעורים המותאמות?'))return;lsRemove(LS_LESSON_EDITS);lsRemove(LS_CUSTOM_LESSONS);lsRemove(LS_DELETED_LESSONS);buildSummaryTable();if(schedInit){schedInit=false;renderScheduleGrid();}showToast('🗑️ כל עריכות השיעורים אופסו');}
+
+// ── Subjects (מקצועות) tab ───────────────────────────────────────────
+let lessonsInit=false;
+let _editingSubjectIdx=-1;
+
+const SUBJECT_TYPE_LABEL={sync:'סינכרוני',async:'אסינכרוני',zoom:'ZOOM/MEET',live:'מפגש חי',other:'אחר'};
+const SUBJECT_TYPE_STYLE={
+  sync:'background:#f0f0f0;color:#555',
+  live:'background:#e2f0d9;color:#2e7d32',
+  zoom:'background:var(--green);color:#fff',
+  async:'background:var(--yellow);color:#333',
+  other:'background:#ddd;color:#555'
+};
+
+function loadSubjects(){
+  const stored=localStorage.getItem(LS_SUBJECTS);
+  if(stored) try{
+    const arr=JSON.parse(stored);
+    // Migrate from old string[] format to {name,type}[]
+    if(arr.length&&typeof arr[0]==='string') return arr.map(s=>({name:s,type:'sync'}));
+    return arr;
+  }catch(e){}
+  // First time: extract unique subject names from DATA
+  const set=new Set();
+  GRADES.forEach(g=>{Object.values(SCHEDULE[g]||{}).forEach(cd=>{(cd.slots||[]).forEach(s=>{if(s.c&&s.c.trim())set.add(s.c.trim());});});});
+  return [...set].sort((a,b)=>a.localeCompare(b,'he')).map(name=>({name,type:'sync'}));
+}
+function saveSubjects(list){lsSet(LS_SUBJECTS,JSON.stringify(list));}
+
+function initSubjectsView(){
+  if(lessonsInit)return;lessonsInit=true;
+  renderSubjectsTable();
+}
+function renderSubjectsTable(){
+  const subjects=loadSubjects();
+  const tbody=document.getElementById('subjectsBody');
+  tbody.innerHTML='';
+  if(!subjects.length){
+    tbody.innerHTML='<tr><td colspan="3" style="text-align:center;padding:20px;color:#aaa">אין מקצועות — הוסף מקצוע חדש</td></tr>';
+    document.getElementById('subjectsCount').textContent='';return;
+  }
+  subjects.forEach((subj,idx)=>{
+    const name=typeof subj==='string'?subj:subj.name;
+    const type=typeof subj==='string'?'sync':(subj.type||'sync');
+    const isEditing=idx===_editingSubjectIdx;
+    const tr=document.createElement('tr');
+    tr.style.background=isEditing?'#fffbe6':'';
+    tr.innerHTML=`<td>${name}</td>
+      <td><span style="font-size:11px;padding:2px 10px;border-radius:10px;${SUBJECT_TYPE_STYLE[type]||SUBJECT_TYPE_STYLE.other}">${SUBJECT_TYPE_LABEL[type]||type}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-lesson-edit" style="margin-left:4px" onclick="editSubjectRow(${idx})">✏ עריכה</button>
+        <button class="btn-lesson-del" onclick="deleteSubjectRow(${idx})">🗑</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('subjectsCount').textContent=`סה"כ: ${subjects.length} מקצועות`;
+}
+
+function addSubjectRow(){
+  const name=(document.getElementById('newSubjectInput').value||'').trim();
+  const type=document.getElementById('newSubjectType').value;
+  if(!name){showToast('⚠️ יש להזין שם מקצוע');return;}
+  const list=loadSubjects();
+  if(_editingSubjectIdx>=0){
+    // Save edit of existing subject
+    const old=list[_editingSubjectIdx];
+    const oldName=typeof old==='string'?old:old.name;
+    if(name!==oldName&&list.some((s,i)=>i!==_editingSubjectIdx&&(typeof s==='string'?s:s.name)===name)){
+      showToast('מקצוע זה כבר קיים ברשימה');return;
+    }
+    // Update any slot edits referencing old name
+    if(name!==oldName){
+      const edits=loadLessonEdits();
+      let changed=false;
+      Object.keys(edits).forEach(k=>{if(edits[k].c===oldName){edits[k].c=name;changed=true;}});
+      if(changed)lsSet(LS_LESSON_EDITS,JSON.stringify(edits));
+    }
+    list[_editingSubjectIdx]={name,type};
+    list.sort((a,b)=>(typeof a==='string'?a:a.name).localeCompare(typeof b==='string'?b:b.name,'he'));
+    saveSubjects(list);
+    showToast(`✅ עודכן: "${oldName}" → "${name}"`);
+    cancelSubjectEdit();
+  } else {
+    // Add new
+    if(list.some(s=>(typeof s==='string'?s:s.name)===name)){showToast('מקצוע זה כבר קיים ברשימה');return;}
+    list.push({name,type});
+    list.sort((a,b)=>(typeof a==='string'?a:a.name).localeCompare(typeof b==='string'?b:b.name,'he'));
+    saveSubjects(list);
+    document.getElementById('newSubjectInput').value='';
+    showToast(`✅ נוסף: ${name}`);
+    renderSubjectsTable();
+  }
+}
+
+function editSubjectRow(idx){
+  const list=loadSubjects();
+  const subj=list[idx];
+  const name=typeof subj==='string'?subj:subj.name;
+  const type=typeof subj==='string'?'sync':(subj.type||'sync');
+  _editingSubjectIdx=idx;
+  document.getElementById('newSubjectInput').value=name;
+  document.getElementById('newSubjectType').value=type;
+  document.getElementById('subjectAddBtn').textContent='✓ שמור שינויים';
+  document.getElementById('subjectCancelBtn').style.display='';
+  document.getElementById('newSubjectInput').focus();
+  renderSubjectsTable();
+}
+
+function cancelSubjectEdit(){
+  _editingSubjectIdx=-1;
+  document.getElementById('newSubjectInput').value='';
+  document.getElementById('newSubjectType').value='sync';
+  document.getElementById('subjectAddBtn').textContent='+ הוסף מקצוע';
+  document.getElementById('subjectCancelBtn').style.display='none';
+  renderSubjectsTable();
+}
+
+function deleteSubjectRow(idx){
+  const list=loadSubjects();
+  const subj=list[idx];
+  const name=typeof subj==='string'?subj:subj.name;
+  if(!confirm(`למחוק את המקצוע "${name}"?`))return;
+  list.splice(idx,1);
+  if(_editingSubjectIdx===idx) cancelSubjectEdit();
+  else _editingSubjectIdx=-1;
+  saveSubjects(list);
+  renderSubjectsTable();
+  showToast(`🗑 נמחק: ${name}`);
+}
+
+// Keep helper stubs so lessonModal HTML onclick attributes don't throw errors
+function closeLessonModal(){const m=document.getElementById('lessonModal');if(m)m.classList.remove('open');}
+function onLessonModalGradeChange(){}
+
+// ── Conflict detection ─────────────────────────────────────────────
+function normalizeTime(t){return t.replace(/\s/g,'').split('-')[0];}
+
+function detectConflicts(){
+  const overrides=loadOverrides();
+  const timeMap={};
+  GRADES.forEach(grade=>{
+    Object.entries(SCHEDULE[grade]||{}).forEach(([className,cd])=>{
+      (cd.slots||[]).filter(s=>s.type==='live').forEach(s=>{
+        const key=lkey(s);
+        const teacher=overrides[key]||(s.tr[0]||null);
+        if(!teacher||!s.t||!s.d) return;
+        const tkey=`${teacher}|${s.d}|${normalizeTime(s.t)}`;
+        if(!timeMap[tkey]) timeMap[tkey]=[];
+        timeMap[tkey].push({teacher,grade,className,content:s.c,lkey:key,isOverride:!!overrides[key]});
+      });
+    });
+  });
+
+  const conflicts=[];
+  conflictKeys.clear();
+  Object.entries(timeMap).forEach(([tkey,entries])=>{
+    if(entries.length<=1) return;
+    const uniq=[...new Set(entries.map(e=>`${e.grade}|${e.className}`))];
+    if(uniq.length<=1) return;
+    const [teacher,day,time]=tkey.split('|');
+    const cid=`${teacher}|${day}|${time}`;
+    conflicts.push({teacher,day,time,entries});
+    if(!dismissedConflicts.has(cid)){
+      entries.forEach(e=>conflictKeys.add(e.lkey));
+    }
+  });
+  return conflicts.sort((a,b)=>a.teacher.localeCompare(b.teacher,'he'));
+}
+
+let allConflicts=[];
+let dismissedConflicts=new Set(JSON.parse(localStorage.getItem(LS_DISMISSED)||'[]'));
+
+function initConflictsView(force){
+  // Populate filters
+  const tf=document.getElementById('conflictTeacherFilter');
+  if(tf.options.length<=1){
+    TEACHERS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tf.appendChild(o);});
+  }
+  const gf=document.getElementById('conflictGradeFilter');
+  if(gf.options.length<=1){
+    GRADES.forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;gf.appendChild(o);});
+  }
+  allConflicts=detectConflicts();
+  renderConflicts();
+}
+
+function renderConflicts(){
+  const filterT=document.getElementById('conflictTeacherFilter').value;
+  const filterG=document.getElementById('conflictGradeFilter').value;
+  let filtered=allConflicts.filter(c=>{
+    if(filterT&&c.teacher!==filterT) return false;
+    if(filterG&&!c.entries.some(e=>e.grade===filterG)) return false;
+    return true;
+  });
+
+  const total=filtered.length;
+  const active=filtered.filter(c=>!dismissedConflicts.has(conflictId(c))).length;
+
+  const summaryEl=document.getElementById('conflictSummary');
+  if(total===0){
+    summaryEl.innerHTML='<div class="conflict-summary ok">✅ לא נמצאו כפילויות! כל המורים משובצים בכיתה אחת בכל זמן נתון.</div>';
+  } else {
+    summaryEl.innerHTML=`<div class="conflict-summary warn">⚠️ נמצאו <strong>${total}</strong> כפילויות (${active} פעילות, ${total-active} מוגדרות כ"ידוע").
+    <br><small>כפילות = אותו מורה, אותו יום, אותה שעה, בשתי כיתות שונות</small></div>`;
+  }
+
+  const listEl=document.getElementById('conflictsList');
+  if(total===0){listEl.innerHTML='';return;}
+
+  let html='';
+  filtered.forEach(conflict=>{
+    const id=conflictId(conflict);
+    const isDismissed=dismissedConflicts.has(id);
+    html+=`<div class="conflict-card${isDismissed?' dismissed':''}" id="cc_${id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="conflict-teacher">${conflict.teacher}</div>
+          <div class="conflict-time">📅 ${conflict.day} · ⏰ ${conflict.time}</div>
+        </div>
+        <span style="font-size:11px;color:#999">${isDismissed?'(ידוע)':''}</span>
+      </div>
+      <div class="conflict-classes">`;
+    conflict.entries.forEach(e=>{
+      const label=e.content.replace(/מפגש meet \/ zoom\s*/,'').replace(/מפגש meet\/zoom\s*/,'').substring(0,45);
+      html+=`<div class="conflict-class-chip${e.isOverride?' override':(e.isOverride?'':'')}">
+        <strong>${e.grade}</strong> · ${e.className}
+        ${e.isOverride?'<span style="color:var(--orange);font-size:10px"> (שינוי ידני)</span>':''}
+        <div style="font-size:10px;color:#777;margin-top:2px">${label}</div>
+      </div>`;
+    });
+    html+=`</div>
+      <div>
+        <button class="btn-goto" onclick="gotoConflict('${esc(conflict.grade||conflict.entries[0]?.grade)}','${esc(conflict.entries[0]?.className)}')">🔗 עבור למערכת</button>
+        <button class="btn-dismiss" onclick="toggleDismiss('${id}',this)">${isDismissed?'↺ החזר':'👁️ סמן כידוע'}</button>
+      </div>
+    </div>`;
+  });
+  listEl.innerHTML=html;
+}
+
+function conflictId(c){return `${c.teacher}|${c.day}|${c.time}`;}
+
+function toggleDismiss(id,btn){
+  if(dismissedConflicts.has(id)){dismissedConflicts.delete(id);}
+  else{dismissedConflicts.add(id);}
+  lsSet(LS_DISMISSED,JSON.stringify([...dismissedConflicts]));
+  detectConflicts();
+  renderConflicts();
+  renderScheduleGrid();
+}
+
+function gotoConflict(grade,className){
+  switchTab('schedule');
+  setTimeout(()=>{
+    const gs=document.getElementById('gradeSelect');
+    gs.value=grade; onGradeChange();
+    setTimeout(()=>{
+      const cs=document.getElementById('classSelect');
+      cs.value=className; renderScheduleGrid();
+    },100);
+  },100);
+}
+
+// ── Assignment tab ─────────────────────────────────────────────────
+let assignInit=false;
+function initAssignView(){if(assignInit)return;assignInit=true;buildConstraintsTable();renderBalanceChart();}
+
+function loadConstraints(){try{return JSON.parse(localStorage.getItem(LS_CONSTRAINTS)||'{}');}catch(e){return{};}}
+function saveConstraints(){
+  const c={};
+  TEACHERS.forEach(teacher=>{
+    const days=[];
+    DAYS_HEB.forEach(day=>{const cb=document.getElementById(`cb_${tid(teacher)}_${day}`);if(cb&&cb.checked)days.push(day);});
+    const mx=document.getElementById(`mx_${tid(teacher)}`);
+    c[teacher]={days,max:mx&&mx.value?parseInt(mx.value):null};
+  });
+  lsSet(LS_CONSTRAINTS,JSON.stringify(c));
+  showToast('✅ החריגים נשמרו');
+  document.getElementById('cstStatus').textContent='נשמר ✓';
+  setTimeout(()=>{document.getElementById('cstStatus').textContent='';},3000);
+  renderBalanceChart();
+}
+function clearConstraints(){lsRemove(LS_CONSTRAINTS);buildConstraintsTable();showToast('🗑️ נוקה');}
+function autoSave(){saveConstraints();}
+function buildConstraintsTable(){
+  const c=loadConstraints(),tb=document.getElementById('constraintsBody');tb.innerHTML='';
+  TEACHERS.forEach(teacher=>{
+    const tc=c[teacher]||{};const tr=document.createElement('tr');
+    let cells=`<td>${teacher}</td>`;
+    DAYS_HEB.forEach(day=>{const chk=(tc.days||[]).includes(day)?'checked':'';cells+=`<td><input type="checkbox" id="cb_${tid(teacher)}_${day}" ${chk} onchange="autoSave()"></td>`;});
+    cells+=`<td><input type="number" id="mx_${tid(teacher)}" value="${tc.max||''}" min="0" max="30" placeholder="∞" onchange="autoSave()"></td>`;
+    tr.innerHTML=cells;tb.appendChild(tr);
+  });
+}
+function tid(n){return n.replace(/\s+/g,'_').replace(/"/g,'quot');}
+
+function renderBalanceChart(){
+  const {summary:CBS}=computeTeacherData();
+  const cl={};TEACHERS.forEach(t=>{cl[t]=GRADES.reduce((s,g)=>s+((CBS[t]||{})[g]||0),0);});
+  const active=TEACHERS.filter(t=>cl[t]>0);
+  const total=active.reduce((s,t)=>s+cl[t],0);
+  const avg=total/active.length;
+  const maxLoad=Math.max(...active.map(t=>cl[t]));
+  const c=loadConstraints();
+  let html='';
+  [...active].sort((a,b)=>cl[b]-cl[a]).forEach(teacher=>{
+    const load=cl[teacher],pct=Math.round(load/maxLoad*100),avgPct=Math.round(avg/maxLoad*100);
+    const cls=load>avg+1.5?'over':load<avg-1.5?'under':'ok';
+    const maxNote=c[teacher]?.max?` (מקס:${c[teacher].max})`:'' ;
+    html+=`<div class="balance-row"><div class="balance-label" title="${teacher}">${teacher}</div>
+      <div class="balance-track">
+        <div class="balance-bar ${cls}" style="width:${pct}%">${load}${maxNote}</div>
+        <div class="balance-target" style="right:${100-avgPct}%" data-label="ממוצע ${avg.toFixed(1)}"></div>
+      </div><div class="balance-val">${load}</div></div>`;
+  });
+  document.getElementById('balanceChart').innerHTML=html;
+}
+
+function detectSubject(content){
+  const subs=['עברית','מתמטיקה','חשבון','אנגלית','מדעים','גאוגרפיה','תנ"ך','אומנות','מוסיקה','מוזיקה','גאומטריה','כישורי חיים','נפתח הלב','ספורט'];
+  for(const s of subs) if(content.includes(s)) return s;
+  return null;
+}
+
+function generateAssignment(){
+  const {summary:CGS,tLessons:CGTL}=computeTeacherData();
+  const constraints=loadConstraints();
+  const targetRaw=document.getElementById('targetInput').value;
+  const cl={};TEACHERS.forEach(t=>{cl[t]=GRADES.reduce((s,g)=>s+((CGS[t]||{})[g]||0),0);});
+  const active=TEACHERS.filter(t=>cl[t]>0);
+  const totalLessons=active.reduce((s,t)=>s+cl[t],0);
+  const target=targetRaw?parseInt(targetRaw):Math.round(totalLessons/active.length);
+  const allLessons=[];
+  GRADES.forEach(g=>{Object.values(SCHEDULE[g]).forEach(cd=>{cd.slots.filter(s=>s.type==='live').forEach(s=>{if(s.tr.length>0)allLessons.push({...s});});});});
+  const teacherGrades={};TEACHERS.forEach(t=>{teacherGrades[t]=new Set(Object.keys(CGTL[t]||{}));});
+  const assignment={};const newLoad={...cl};
+  allLessons.forEach(l=>{assignment[lkey(l)]=l.tr[0];});
+  for(let iter=0;iter<4;iter++){
+    const overT=active.filter(t=>newLoad[t]>target+1).sort((a,b)=>newLoad[b]-newLoad[a]);
+    const underT=active.filter(t=>newLoad[t]<target-1).sort((a,b)=>newLoad[a]-newLoad[b]);
+    if(!overT.length||!underT.length)break;
+    for(const overTeacher of overT){
+      const theirLessons=allLessons.filter(l=>assignment[lkey(l)]===overTeacher);
+      for(const lesson of theirLessons){
+        if(newLoad[overTeacher]<=target+1)break;
+        const tExtData=loadTeacherExt();
+        const eligible=underT.filter(t=>{
+          if(t===overTeacher)return false;
+          const cst=constraints[t]||{};
+          if((cst.days||[]).includes(lesson.d))return false;
+          if(cst.max&&newLoad[t]>=cst.max)return false;
+          if(!teacherGrades[t].has(lesson.g))return false;
+          const tSubs=(tExtData[t]||{}).subjects||[];
+          if(tSubs.length>0){const ls=detectSubject(lesson.c);if(ls&&!tSubs.includes(ls))return false;}
+          return true;
+        });
+        if(eligible.length){eligible.sort((a,b)=>newLoad[a]-newLoad[b]);const newT=eligible[0];assignment[lkey(lesson)]=newT;newLoad[overTeacher]--;newLoad[newT]++;}
+      }
+    }
+  }
+  const violations=[];
+  allLessons.forEach(l=>{const origT=l.tr[0];const cst=constraints[origT]||{};if((cst.days||[]).includes(l.d))violations.push({lesson:l,teacher:origT});});
+  renderAssignResult(allLessons,assignment,newLoad,cl,target,violations,constraints);
+}
+
+function lkey(l){return `${l.g}|${l.cls}|${l.d}|${l.t}|${l.c.substring(0,25)}`;}
+
+function renderAssignResult(lessons,assignment,newLoad,oldLoad,target,violations,constraints){
+  const container=document.getElementById('assignResult');
+  const active=TEACHERS.filter(t=>oldLoad[t]>0);
+  const maxLoad=Math.max(...active.map(t=>newLoad[t]));
+  let statsHtml='<div style="margin-bottom:16px"><strong style="color:var(--navy)">השוואת עומס: לפני ואחרי</strong><div style="margin-top:10px">';
+  active.sort((a,b)=>newLoad[b]-newLoad[a]).forEach(t=>{
+    const old=oldLoad[t]||0,nw=newLoad[t]||0,changed=old!==nw;
+    const pOld=Math.round(old/maxLoad*80),pNew=Math.round(nw/maxLoad*80);
+    const cls2=nw>target+1?'var(--red)':nw<target-1?'#aaa':'var(--accent)';
+    statsHtml+=`<div style="display:flex;align-items:center;margin-bottom:5px;gap:8px"><div style="width:80px;text-align:right;font-size:12px;font-weight:600">${t}</div><div><span class="compare-bar" style="width:${pOld}px;background:#ccc" title="לפני: ${old}"></span><span class="compare-bar" style="width:${pNew}px;background:${cls2}" title="אחרי: ${nw}"></span></div><div style="font-size:11px;color:#666">${old}→<strong>${nw}</strong>${changed?'<span class="badge-changed" style="margin-right:4px">שינוי</span>':''}</div></div>`;
+  });
+  statsHtml+='</div></div>';
+  let vioHtml='';
+  if(violations.length){
+    vioHtml=`<div style="background:#ffe8e8;border:1px solid var(--red);border-radius:8px;padding:12px;margin-bottom:14px"><strong style="color:var(--red)">⚠️ ${violations.length} הפרות חריגים</strong><div style="font-size:12px;margin-top:6px">`;
+    violations.forEach(({lesson:l,teacher:t})=>{vioHtml+=`<div style="margin-top:4px">• <b>${t}</b> משובץ ב<b>${l.d}</b> (${l.cls})</div>`;});
+    vioHtml+='</div></div>';
+  }
+  const changed=lessons.filter(l=>assignment[lkey(l)]!==l.tr[0]);
+  let tableHtml=`<div style="font-size:12px;margin-bottom:8px;color:#666">${changed.length} שינויים מוצעים · יעד: ${target}</div><div style="overflow-x:auto"><table class="result-table"><thead><tr><th>שכבה</th><th>כיתה</th><th>יום</th><th>שעה</th><th>שיעור</th><th>מורה נוכחי</th><th>מורה מוצע</th><th>סטטוס</th></tr></thead><tbody>`;
+  changed.forEach(l=>{
+    const orig=l.tr[0],proposed=assignment[lkey(l)];
+    const txt=l.c.replace(/מפגש meet \/ zoom\s*/,'').substring(0,40);
+    tableHtml+=`<tr class="changed"><td>${l.g.replace('שכבת','שכבה')}</td><td>${l.cls}</td><td>${l.d}</td><td>${l.t||''}</td><td title="${l.c}">${txt}…</td><td>${orig}</td><td><strong>${proposed}</strong></td><td><span class="badge-changed">שינוי</span></td></tr>`;
+  });
+  if(lessons.length>changed.length){
+    tableHtml+=`<tr><td colspan="8" style="text-align:center;padding:6px;background:#f9f9f9;cursor:pointer;color:var(--accent)" onclick="toggleUnchanged(this)">▼ הצג ${lessons.length-changed.length} שיעורים ללא שינוי</td></tr><tbody id="unchangedRows" style="display:none">`;
+    lessons.filter(l=>assignment[lkey(l)]===l.tr[0]).forEach(l=>{
+      const cst=constraints[l.tr[0]]||{};const isVio=(cst.days||[]).includes(l.d);
+      const txt=l.c.replace(/מפגש meet \/ zoom\s*/,'').substring(0,40);
+      tableHtml+=`<tr class="${isVio?'violation':''}"><td>${l.g.replace('שכבת','שכבה')}</td><td>${l.cls}</td><td>${l.d}</td><td>${l.t||''}</td><td>${txt}…</td><td>${l.tr[0]}</td><td>${l.tr[0]}</td><td>${isVio?'<span class="badge-violation">חריגה!</span>':'<span class="badge-ok">ללא שינוי</span>'}</td></tr>`;
+    });
+    tableHtml+='</tbody>';
+  }
+  tableHtml+='</tbody></table></div>';
+  container.innerHTML=statsHtml+vioHtml+tableHtml;
+}
+function toggleUnchanged(el){const tb=document.getElementById('unchangedRows');if(tb.style.display==='none'){tb.style.display='';el.textContent='▲ הסתר שיעורים ללא שינוי';}else{tb.style.display='none';el.textContent='▼ הצג שיעורים ללא שינוי';}}
+
+// ── Utils ──────────────────────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"\\'").replace(/\n/g,' ');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+// ── Init ───────────────────────────────────────────────────────────
+buildSummaryTable();
+</script>
+</body>
+</html>
