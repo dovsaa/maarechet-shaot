@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>מדריך למשתמש — מערכת שעות</title>
+<style>
+:root{
+  --navy:#1F3864;--blue:#2E75B6;--accent:#4472C4;--light:#BDD7EE;--vlight:#D9E1F2;
+  --bg:#F0F4FA;--green:#70ad47;--yellow:#ffc000;--red:#e74c3c;--orange:#f39c12;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;background:var(--bg);color:#222;overflow-x:hidden;}
+
+/* ── Layout ── */
+#wrap{display:flex;min-height:100vh;}
+#sidebar{width:260px;background:var(--navy);color:#fff;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;}
+#content{flex:1;padding:32px 40px;max-width:860px;}
+
+/* ── Sidebar ── */
+#sidebar h2{font-size:13px;font-weight:700;padding:20px 18px 8px;color:#aac4e8;letter-spacing:.5px;text-transform:uppercase;}
+#sidebar a{display:block;padding:9px 18px;color:#cdd8ed;font-size:13px;text-decoration:none;border-right:3px solid transparent;transition:.15s;}
+#sidebar a:hover,#sidebar a.active{background:rgba(255,255,255,.1);color:#fff;border-right-color:var(--accent);}
+#sidebar .sep{height:1px;background:rgba(255,255,255,.1);margin:8px 14px;}
+#sidebar .logo{padding:20px 18px 4px;display:flex;align-items:center;gap:8px;}
+#sidebar .logo span{font-size:1rem;font-weight:700;line-height:1.3;}
+
+/* ── Sections ── */
+section{margin-bottom:52px;}
+section h1{font-size:1.5rem;color:var(--navy);border-bottom:3px solid var(--accent);padding-bottom:10px;margin-bottom:20px;}
+section h2{font-size:1.1rem;color:var(--navy);margin:28px 0 10px;display:flex;align-items:center;gap:8px;}
+section h3{font-size:.95rem;color:var(--blue);margin:20px 0 8px;font-weight:700;}
+p{line-height:1.7;margin-bottom:10px;color:#333;}
+ul,ol{padding-right:22px;margin-bottom:10px;}
+li{line-height:1.8;color:#333;}
+
+/* ── Callouts ── */
+.tip,.warn,.danger,.info{border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13px;line-height:1.6;display:flex;gap:10px;align-items:flex-start;}
+.tip{background:#e2f0d9;border-right:4px solid var(--green);}
+.warn{background:#fff3e0;border-right:4px solid var(--orange);}
+.danger{background:#ffe8e8;border-right:4px solid var(--red);}
+.info{background:var(--vlight);border-right:4px solid var(--accent);}
+.tip .icon,.warn .icon,.danger .icon,.info .icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+
+/* ── Steps ── */
+.steps{counter-reset:step;list-style:none;padding:0;margin:14px 0;}
+.steps li{counter-increment:step;display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;}
+.steps li::before{content:counter(step);background:var(--accent);color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px;}
+.steps li .text{flex:1;line-height:1.7;}
+
+/* ── UI Mock ── */
+.mock{background:#fff;border:1px solid #d0dff0;border-radius:8px;padding:14px 16px;margin:12px 0;font-size:12.5px;box-shadow:0 2px 6px #0001;}
+.mock-bar{background:var(--navy);color:#fff;padding:7px 14px;border-radius:5px 5px 0 0;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;margin:-14px -16px 12px;}
+.mock-tab{display:inline-block;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:4px 4px 0 0;font-size:11px;cursor:default;}
+.mock-tab.act{background:var(--accent);}
+.btn-mock{display:inline-flex;align-items:center;gap:4px;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:default;margin:2px;}
+.btn-mock.green{background:var(--green);color:#fff;}
+.btn-mock.blue{background:var(--blue);color:#fff;}
+.btn-mock.orange{border:2px solid var(--orange);color:var(--orange);background:#fff;}
+.btn-mock.orange.act{background:var(--orange);color:#fff;}
+.btn-mock.red{background:var(--red);color:#fff;}
+.btn-mock.gray{background:#ddd;color:#333;}
+.slot-demo{border-radius:5px;padding:6px 10px;margin:4px 0;font-size:11.5px;border-right:3px solid transparent;}
+.slot-demo.live{background:#e2f0d9;border-color:var(--green);}
+.slot-demo.async{background:#fff2cc;border-color:var(--yellow);}
+.slot-demo.conflict{background:#ffe8e8;border-color:var(--red);}
+.slot-demo.zoom{background:#e2f0d9;border-color:var(--green);}
+.slot-demo .teacher{font-size:10px;color:#666;margin-top:2px;}
+.slot-demo .teacher span{background:var(--light);border-radius:3px;padding:1px 5px;}
+.indicator{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-left:4px;}
+.ind-green{background:#70ad47;}
+.ind-red{background:#e74c3c;}
+.ind-yellow{background:#ffc000;}
+.field-label{font-size:11px;color:#555;margin-bottom:3px;display:block;font-weight:600;}
+.field-mock{border:1px solid var(--light);border-radius:5px;padding:5px 10px;font-size:12px;color:#333;background:#fafafa;display:inline-block;min-width:140px;}
+.field-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:8px 0;}
+.badge{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700;}
+.badge-green{background:#e2f0d9;color:#2e7d32;}
+.badge-yellow{background:#fff2cc;color:#7a5800;}
+.badge-blue{background:var(--vlight);color:var(--navy);}
+.badge-gray{background:#eee;color:#555;}
+.table-mock{border-collapse:collapse;width:100%;font-size:12px;margin:8px 0;}
+.table-mock th{background:var(--navy);color:#fff;padding:7px 10px;text-align:right;}
+.table-mock td{padding:6px 9px;border-bottom:1px solid #e8eff8;vertical-align:middle;}
+.table-mock tr:hover td{background:var(--vlight);}
+hr.section-line{border:none;border-top:2px solid var(--light);margin:40px 0;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;}
+@media(max-width:700px){.two-col{grid-template-columns:1fr;}#sidebar{display:none;}#content{padding:20px;}}
+.kbd{display:inline-block;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;padding:1px 7px;font-size:11px;font-family:monospace;}
+.version-tag{background:var(--green);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;margin-right:8px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<!-- ═══ SIDEBAR ═══ -->
+<nav id="sidebar">
+  <div class="logo">📋 <span>מדריך<br>מערכת שעות</span></div>
+  <div class="sep"></div>
+  <h2>ניווט מהיר</h2>
+  <a href="#overview">🏠 סקירה כללית</a>
+  <a href="#topbar">🔝 סרגל עליון</a>
+  <a href="#sync">☁️ סנכרון ענן</a>
+  <div class="sep"></div>
+  <h2>טאבים</h2>
+  <a href="#summary">📊 סיכום לפי מורה</a>
+  <a href="#schedule">🗓 מערכת שעות מלאה</a>
+  <a href="#edit-popup">✏️ עריכת שיעור</a>
+  <a href="#conflicts">⚠️ כפילויות</a>
+  <a href="#teachers">👥 ניהול מורים</a>
+  <a href="#subjects">📚 ניהול מקצועות</a>
+  <div class="sep"></div>
+  <h2>עבודה משותפת</h2>
+  <a href="#multiuser">👫 מרובה משתמשים</a>
+  <a href="#safety">🛡️ שמירה בטוחה</a>
+  <a href="#faq">❓ שאלות נפוצות</a>
+</nav>
+
+<!-- ═══ CONTENT ═══ -->
+<main id="content">
+
+<!-- ─── OVERVIEW ─── -->
+<section id="overview">
+  <h1>🏠 סקירה כללית</h1>
+  <p>מערכת שעות – למידה מרחוק מאפשרת לצוות המורים לנהל ולשבץ מערכת שעות משותפת בענן. כל שינוי שמבצע משתמש אחד מגיע אוטומטית לכל שאר המשתמשים תוך שניות — ללא צורך בשמירה ידנית.</p>
+  <div class="two-col">
+    <div class="info">
+      <span class="icon">👥</span>
+      <div><strong>עבודה שיתופית:</strong> כמה מורים יכולים להיות מחוברים בו-זמנית ולעדכן את המערכת. שינויים מסונכרנים אוטומטית.</div>
+    </div>
+    <div class="tip">
+      <span class="icon">💾</span>
+      <div><strong>שמירה אוטומטית:</strong> כל שינוי נשמר ב-0.4 שניות לענן. אין צורך ללחוץ "שמור" — זה קורה לבד.</div>
+    </div>
+  </div>
+
+  <h2>🗺️ מבנה המסך</h2>
+  <div class="mock">
+    <div class="mock-bar">
+      <span>📋 מערכת שעות – למידה מרחוק</span>
+      <span style="margin-right:auto;background:rgba(112,173,71,.4);padding:2px 10px;border-radius:8px;font-size:11px">🟢 מחובר לענן</span>
+      <span style="background:rgba(255,255,255,.15);padding:4px 12px;border-radius:6px;font-size:11px">🔍 חיפוש מורה...</span>
+      <span class="btn-mock blue" style="font-size:11px">🔄 רענן הכל</span>
+    </div>
+    <div style="background:var(--navy);padding:6px 0;display:flex;gap:3px;padding-right:14px;border-bottom:3px solid var(--accent)">
+      <span class="mock-tab act">סיכום לפי מורה</span>
+      <span class="mock-tab">מערכת שעות מלאה</span>
+      <span class="mock-tab">⚠️ כפילויות</span>
+      <span class="mock-tab">👥 ניהול מורים</span>
+      <span class="mock-tab">📚 ניהול מקצועות</span>
+    </div>
+    <div style="padding:10px;color:#666;font-size:12px;text-align:center">תוכן הטאב הנבחר מוצג כאן</div>
+  </div>
+  <ul>
+    <li><strong>סרגל עליון</strong> — סטטוס חיבור ענן, חיפוש מורה, כפתור רענן הכל</li>
+    <li><strong>שורת טאבים</strong> — ניווט בין כל מדורי המערכת</li>
+    <li><strong>אזור תוכן</strong> — תוכן הטאב הנבחר</li>
+    <li><strong>לוח פרטים (צד שמאל)</strong> — נפתח בלחיצה על מורה/שיעור ומציג פירוט</li>
+  </ul>
+</section>
+
+<!-- ─── TOPBAR ─── -->
+<section id="topbar">
+  <h1>🔝 סרגל עליון</h1>
+
+  <h2>☁️ מחוון חיבור ענן</h2>
+  <div class="two-col">
+    <div class="tip"><span class="icon">🟢</span><div><strong>מחובר לענן</strong> — שינויים נשמרים ומסונכרנים בזמן אמת. מצב תקין.</div></div>
+    <div class="danger"><span class="icon">🔴</span><div><strong>מנותק</strong> — אין חיבור לאינטרנט. שינויים נשמרים באופן מקומי ויסונכרנו כשהחיבור יחזור.</div></div>
+  </div>
+
+  <h2>🔍 חיפוש מורה</h2>
+  <p>הקלדה בשדה החיפוש מסננת את <strong>טבלת הסיכום</strong> בזמן אמת — מוצגות רק שורות המורים שהשם שלהם מכיל את הטקסט שהוקלד.</p>
+
+  <h2>🔄 כפתור "רענן הכל"</h2>
+  <p>לוחץ על הכפתור מאתחל ומציג מחדש את כל המסכים (סיכום מורה, מערכת שעות, כפילויות). <strong>לא</strong> מבצע שמירה — השמירה קורה אוטומטית.</p>
+  <div class="info"><span class="icon">💡</span><div>השתמש בכפתור זה לאחר שמישהו אחר ביצע שינויים ורוצים לוודא שהמסך מעודכן, או אם הצגה נראית ישנה.</div></div>
+</section>
+
+<!-- ─── CLOUD SYNC ─── -->
+<section id="sync">
+  <h1>☁️ כיצד עובד הסנכרון</h1>
+  <p>המערכת משתמשת ב-Firebase Realtime Database — בסיס נתונים בענן שמסנכרן נתונים בין כל הדפדפנים בזמן אמת.</p>
+
+  <h2>⏱️ מחזור שמירה</h2>
+  <ol class="steps">
+    <li><div class="text">המשתמש מבצע שינוי (עדכון מורה, עריכת שיעור, הוספת מקצוע וכו')</div></li>
+    <li><div class="text">השינוי נשמר <strong>מיד</strong> ב-localStorage של הדפדפן (גיבוי מקומי)</div></li>
+    <li><div class="text">תוך <strong>0.4 שניות</strong> — כל הנתונים נכתבים אוטומטית ל-Firebase</div></li>
+    <li><div class="text">כל שאר המשתמשים המחוברים מקבלים <strong>עדכון אוטומטי</strong> בזמן אמת</div></li>
+    <li><div class="text">המסך מתרענן אצל כל משתמש — ללא צורך בפעולה ידנית</div></li>
+  </ol>
+
+  <div class="tip"><span class="icon">✅</span><div>אין צורך ב"שמור" ידני. המערכת שומרת הכל אוטומטית תוך פחות משנייה.</div></div>
+  <div class="warn"><span class="icon">⚠️</span><div>אם שני משתמשים עורכים <strong>את אותו שיעור</strong> בו-זמנית — השינוי האחרון יגבר. מומלץ לתאם ולא לערוך אותו שיעור בעת ובעונה אחת.</div></div>
+</section>
+
+<hr class="section-line">
+
+<!-- ─── SUMMARY ─── -->
+<section id="summary">
+  <h1>📊 טאב: סיכום לפי מורה</h1>
+  <p>מציג טבלה מרכזית של <strong>כמות השיעורים</strong> של כל מורה בכל שכבה. זהו המסך הראשי שנפתח בכניסה למערכת.</p>
+
+  <h2>📋 קריאת הטבלה</h2>
+  <div class="mock">
+    <table class="table-mock">
+      <thead><tr><th>מורה</th><th>שכבת א</th><th>שכבת ב</th><th>שכבת ג</th><th>סה"כ</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:700;color:var(--navy);cursor:pointer">יהודית <span style="font-size:10px;color:var(--accent)">▶</span></td>
+          <td><span style="background:var(--light);border-radius:4px;padding:2px 10px;font-weight:700;cursor:pointer">3</span></td>
+          <td><span style="background:var(--light);border-radius:4px;padding:2px 10px;font-weight:700;cursor:pointer">5</span></td>
+          <td>—</td>
+          <td style="background:var(--vlight);font-weight:700">8</td>
+        </tr>
+        <tr>
+          <td style="font-weight:700;color:var(--navy);cursor:pointer">מיטל ג <span style="font-size:10px;color:var(--accent)">▶</span></td>
+          <td>—</td>
+          <td><span style="background:var(--light);border-radius:4px;padding:2px 10px;font-weight:700;cursor:pointer">2</span></td>
+          <td><span style="background:var(--light);border-radius:4px;padding:2px 10px;font-weight:700;cursor:pointer">4</span></td>
+          <td style="background:var(--vlight);font-weight:700">6</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>🖱️ פעולות אינטראקטיביות</h2>
+  <ul>
+    <li><strong>לחיצה על שם מורה</strong> — פותח לוח פרטים (צד שמאל) עם כל שיעורי המורה מפורטים לפי יום ושעה</li>
+    <li><strong>לחיצה על מספר בתא</strong> — מסנן את מערכת השעות לפי המורה ושכבה הספציפיים, ופותח לוח פרטים</li>
+    <li><strong>שורת סה"כ</strong> — מציגה סכום כולל לכל שכבה ולכל מורה</li>
+  </ul>
+
+  <h2>🔍 סינון בחיפוש</h2>
+  <p>הקלד שם מורה בשדה החיפוש שבסרגל העליון — הטבלה תסנן ותציג רק את המורים הרלוונטיים.</p>
+</section>
+
+<!-- ─── SCHEDULE ─── -->
+<section id="schedule">
+  <h1>🗓 טאב: מערכת שעות מלאה</h1>
+  <p>מציג את לוח השיעורים המלא לפי שכבה וכיתות. כאן מבצעים שיבוצים ידניים של מורים לשיעורים.</p>
+
+  <h2>🎛️ כלי הניווט</h2>
+  <div class="mock">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span class="btn-mock orange">✏️ מצב עריכה</span>
+      <span style="font-size:12px;color:var(--orange)">24 שינויים ידניים פעילים</span>
+      <span class="btn-mock green" style="margin-right:auto">📥 ייצוא לאקסל</span>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:8px">
+      <span><strong>שכבה:</strong> <span class="field-mock" style="min-width:80px">שכבת ב ▾</span></span>
+      <span><strong>כיתות:</strong>
+        <label style="border:1px solid var(--accent);border-radius:5px;padding:2px 8px;font-size:11px;background:var(--vlight)"><input type="checkbox" checked style="accent-color:var(--accent)"> כיתה ב2</label>
+        <label style="border:1px solid #ccc;border-radius:5px;padding:2px 8px;font-size:11px"><input type="checkbox"> כיתה ב3</label>
+      </span>
+      <span><strong>סינון מורה:</strong> <span class="field-mock" style="min-width:120px">— כל המורים — ▾</span></span>
+    </div>
+  </div>
+
+  <h3>שדה שכבה</h3>
+  <p>בחר שכבה (א–ו) מהרשימה הנפתחת. הכיתות זמינות לאותה שכבה יופיעו לבחירה.</p>
+  <h3>בחירת כיתות</h3>
+  <p>ניתן לסמן <strong>כמה כיתות בו-זמנית</strong> — המערכת תציג את כל לוחות השיעורים שנבחרו זה אחרי זה לגלילה נוחה.</p>
+  <h3>סינון מורה</h3>
+  <p>בחירת מורה ספציפי מדגיש (צבע ירוק כהה) את כל שיעוריו בלוח — שאר השיעורים נשארים גלויים אך לא מודגשים.</p>
+
+  <h2>🎨 מקרא צבעים</h2>
+  <div class="mock">
+    <div class="slot-demo live">מפגש חי / ZOOM/MEET<div class="teacher"><span>יהודית</span></div></div>
+    <div class="slot-demo async">משימה / אסינכרוני<div class="teacher" style="font-size:10px;color:#888">ללא מורה — עצמאי</div></div>
+    <div class="slot-demo conflict">כפילות! — שתי כיתות, אותו מורה<div class="teacher"><span>מיטל ג</span></div></div>
+  </div>
+  <ul>
+    <li><span style="display:inline-block;width:14px;height:14px;background:#e2f0d9;border-right:3px solid #70ad47;border-radius:3px;vertical-align:middle;margin-left:5px"></span> <strong>ירוק</strong> — מפגש חי / ZOOM/MEET</li>
+    <li><span style="display:inline-block;width:14px;height:14px;background:#fff2cc;border-right:3px solid #ffc000;border-radius:3px;vertical-align:middle;margin-left:5px"></span> <strong>צהוב</strong> — משימה / אסינכרוני (ללא מורה)</li>
+    <li><span style="display:inline-block;width:14px;height:14px;background:#70ad47;border-radius:3px;vertical-align:middle;margin-left:5px"></span> <strong>ירוק כהה</strong> — שיעור של המורה שנבחר בסינון</li>
+    <li><span style="display:inline-block;width:14px;height:14px;background:#ffe8e8;border-right:3px solid #e74c3c;border-radius:3px;vertical-align:middle;margin-left:5px"></span> <strong>אדום</strong> — כפילות (אותו מורה בשתי כיתות באותה שעה)</li>
+  </ul>
+
+  <h2>✏️ מצב עריכה</h2>
+  <ol class="steps">
+    <li><div class="text">לחץ על <strong>"✏️ מצב עריכה"</strong> — הכפתור יהפוך לכתום ויוצגו כפתורי עריכה קטנים (<span style="background:var(--orange);color:#fff;border-radius:3px;padding:1px 6px;font-size:11px">✏</span>) על כל שיעור</div></li>
+    <li><div class="text">לחץ על כפתור ה-✏ על השיעור שרוצים לערוך — נפתח חלון עריכה</div></li>
+    <li><div class="text">בחר מורה, מקצוע וסוג שיעור לפי הצורך, ולחץ "✓ שמור"</div></li>
+    <li><div class="text">השינוי יופיע מיד ויסונכרן אוטומטית לכל המשתמשים</div></li>
+  </ol>
+  <div class="warn"><span class="icon">⚠️</span><div>כדי לראות את כפתורי העריכה — יש <strong>להפעיל את מצב עריכה תחילה</strong>. בלי זה לא יופיע כפתור ✏ על השיעורים.</div></div>
+
+  <h2>📥 ייצוא לאקסל</h2>
+  <p>הכפתור מוריד קובץ Excel הכולל:</p>
+  <ul>
+    <li>גיליון נפרד לכל כיתה שנבחרה — עם שעות, ימים ושיבוץ מורים</li>
+    <li>גיליון סיכום כולל לפי מורים ושכבות</li>
+  </ul>
+</section>
+
+<!-- ─── EDIT POPUP ─── -->
+<section id="edit-popup">
+  <h1>✏️ חלון עריכת שיעור</h1>
+  <p>נפתח בלחיצה על כפתור ✏ בשיעור (רק כשמצב עריכה פעיל). מאפשר שינוי מורה, מקצוע וסוג שיעור.</p>
+
+  <div class="mock" style="max-width:320px">
+    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px">עריכת שיעור</div>
+    <div style="font-size:11px;color:#666;margin-bottom:10px">כיתה ב2 · יום שני · 09:00-09:45</div>
+    <label class="field-label">מורה:</label>
+    <div class="field-mock" style="width:100%;margin-bottom:8px">מיטל ג ▾</div>
+    <label class="field-label">מקצוע:</label>
+    <div class="field-mock" style="width:100%;margin-bottom:8px">עברית (סינכרוני) ▾</div>
+    <label class="field-label">סוג שיעור:</label>
+    <div class="field-mock" style="width:100%;margin-bottom:12px">סינכרוני ▾</div>
+    <div style="display:flex;gap:8px">
+      <span class="btn-mock green">✓ שמור</span>
+      <span class="btn-mock red">↺ בטל שינוי</span>
+      <span class="btn-mock gray">✕ סגור</span>
+    </div>
+  </div>
+
+  <h2>📝 שדות החלון</h2>
+
+  <h3>מורה</h3>
+  <p>רשימה נפתחת של כל המורים במערכת. בחירת מורה חדש תשבץ אותו לשיעור זה.</p>
+  <div class="tip"><span class="icon">💡</span><div>כדי להסיר מורה מהשיעור — בחר "— ללא מורה —" מראש הרשימה.</div></div>
+
+  <h3>מקצוע</h3>
+  <p>רשימה נפתחת של כל המקצועות שהוגדרו בטאב "ניהול מקצועות". בחירת מקצוע תמלא אוטומטית גם את שדה סוג השיעור.</p>
+
+  <h3>סוג שיעור</h3>
+  <p>קובע את צבע השיעור בלוח:</p>
+  <ul>
+    <li><span class="badge badge-green">ZOOM/MEET</span> — ירוק (מפגש זום/מיט)</li>
+    <li><span class="badge badge-green">סינכרוני</span> — לבן (שיעור בזמן אמת)</li>
+    <li><span class="badge badge-yellow">אסינכרוני</span> — צהוב (משימה עצמאית)</li>
+    <li><span class="badge badge-gray">אחר</span> — אפור</li>
+  </ul>
+
+  <h2>🔘 כפתורי הפעולה</h2>
+  <ul>
+    <li><strong>✓ שמור</strong> — שומר את השינוי ומסנכרן לכולם</li>
+    <li><strong>↺ בטל שינוי</strong> — מחזיר את השיעור למצב המקורי (לפני כל שינויים ידניים)</li>
+    <li><strong>✕ סגור</strong> — סוגר את החלון ללא שמירה</li>
+  </ul>
+  <div class="warn"><span class="icon">⚠️</span><div>לחיצה על "↺ בטל שינוי" <strong>מוחקת לצמיתות</strong> את כל השינויים שנעשו בשיעור זה וחוזרת לנתון המקורי.</div></div>
+</section>
+
+<!-- ─── CONFLICTS ─── -->
+<section id="conflicts">
+  <h1>⚠️ טאב: כפילויות</h1>
+  <p>מציג את כל המקרים בהם <strong>אותו מורה משובץ בשתי כיתות שונות באותו יום ובאותה שעה</strong>.</p>
+
+  <h2>📋 קריאת דוח הכפילויות</h2>
+  <div class="mock">
+    <div style="background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 14px;border-right:4px solid var(--red)">
+      <div style="font-weight:700;color:var(--navy);font-size:14px">מיטל ג</div>
+      <div style="font-size:12px;color:#555;margin:3px 0 8px">יום שני · 09:00-09:45</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="background:var(--vlight);border:1px solid var(--light);border-radius:6px;padding:5px 10px;font-size:12px">כיתה ב2</span>
+        <span style="background:var(--vlight);border:1px solid var(--light);border-radius:6px;padding:5px 10px;font-size:12px">כיתה ג1</span>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <span class="btn-mock blue" style="font-size:11px">🔍 עבור לשיעור</span>
+        <span class="btn-mock gray" style="font-size:11px">✓ התעלם</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>🔍 סינון הכפילויות</h2>
+  <p>ניתן לסנן לפי <strong>מורה ספציפי</strong> או לפי <strong>שכבה ספציפית</strong> — שימושי כשיש הרבה כפילויות ורוצים להתמקד.</p>
+
+  <h2>🔘 פעולות</h2>
+  <ul>
+    <li><strong>"🔍 עבור לשיעור"</strong> — עובר אוטומטית למערכת השעות המלאה ומציג את הכיתה הרלוונטית, עם המורה הכפול מסונן</li>
+    <li><strong>"✓ התעלם"</strong> — מסמן את הכפילות כידועה ומקטין אותה חזואלית (עדיין קיימת אך לא בולטת). שימושי לכפילויות מכוונות.</li>
+  </ul>
+  <div class="tip"><span class="icon">💡</span><div>לאחר תיקון כפילות דרך מצב עריכה, לחץ <strong>"🔄 רענן בדיקה"</strong> כדי לעדכן את הרשימה.</div></div>
+</section>
+
+<!-- ─── TEACHERS ─── -->
+<section id="teachers">
+  <h1>👥 טאב: ניהול מורים</h1>
+  <p>מאפשר ניהול מלא של רשימת המורים — שינוי שמות, הגדרת יום חופשי, מחנכות ומקצועות.</p>
+
+  <div class="warn"><span class="icon">⚠️</span><div><strong>טאב רגיש!</strong> שינויים כאן משפיעים על כל המערכת. לאחר כל שינוי — חובה ללחוץ <strong>"🔄 עדכן נתונים"</strong> כדי שהשינויים ייכנסו לתוקף.</div></div>
+
+  <h2>📋 עמודות הטבלה</h2>
+
+  <div class="mock">
+    <table class="table-mock">
+      <thead><tr><th>שם מורה</th><th>יום חופשי</th><th>מחנכת + כיתה</th><th>מקצועות</th><th>פעולה</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><input type="text" value="יהודית" style="border:1px solid var(--light);border-radius:4px;padding:3px 7px;font-size:12px;width:120px"></td>
+          <td><select style="border:1px solid var(--light);border-radius:4px;font-size:12px;padding:2px">
+            <option>— אין —</option><option>שישי</option></select></td>
+          <td><span class="badge badge-blue">מחנכת</span> <span style="font-size:11px">שכבת א · כיתה א1</span></td>
+          <td><span style="font-size:11px;background:var(--vlight);padding:2px 6px;border-radius:3px">עברית</span> <span style="font-size:11px;background:var(--vlight);padding:2px 6px;border-radius:3px">מתמטיקה</span></td>
+          <td><span class="btn-mock red" style="font-size:11px">✕ מחק</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>שם מורה</h3>
+  <p>ניתן לשנות שם מורה ישירות בשדה הטקסט. <strong>חשוב:</strong> לאחר שינוי שם — לחץ "עדכן נתונים" ואז הדף יטען מחדש עם השם החדש בכל המקומות.</p>
+
+  <h3>יום חופשי</h3>
+  <p>הגדר יום בשבוע שבו המורה אינו זמין. שדה זה הוא לצרכי מידע — לא חוסם שיבוץ אוטומטית.</p>
+
+  <h3>מחנכת + כיתה</h3>
+  <p>סמן "מחנכת" ובחר שכבה וכיתה — מגדיר לאיזו כיתה המורה הוא מחנך/ת. מידע זה מוצג בסיכום ובמערכת השעות.</p>
+
+  <h3>מקצועות</h3>
+  <p>סמן את המקצועות שהמורה מלמד. המידע מוצג לצרכי מידע ואינפורמציה.</p>
+
+  <h2>🔘 כפתורי הפעולה</h2>
+  <ul>
+    <li><strong>"+ הוסף מורה"</strong> — מוסיף שורה חדשה לרשימה</li>
+    <li><strong>"🔄 עדכן נתונים"</strong> — <span style="color:var(--red);font-weight:700">חובה ללחוץ אחרי כל שינוי!</span> מעדכן את כל המערכת עם הנתונים החדשים</li>
+    <li><strong>"🔄 איפוס לברירת מחדל"</strong> — מחזיר את רשימת המורים לנתונים המקוריים (מוחק כל שינוי שנעשה)</li>
+  </ul>
+
+  <div class="danger"><span class="icon">🚨</span><div><strong>איפוס לברירת מחדל</strong> מוחק את כל השינויים שנעשו לרשימת המורים ולא ניתן לבטל פעולה זו. השתמש רק במקרה הצורך.</div></div>
+
+  <h2>✅ תהליך עדכון מורה — שלב אחר שלב</h2>
+  <ol class="steps">
+    <li><div class="text">עבור לטאב <strong>"👥 ניהול מורים"</strong></div></li>
+    <li><div class="text">בצע את השינויים הרצויים (עדכון שם / יום חופשי / מחנכת / מקצועות)</div></li>
+    <li><div class="text">לחץ <strong>"🔄 עדכן נתונים"</strong></div></li>
+    <li><div class="text">הדף יתרענן ויציג הודעת אישור. כל שאר המשתמשים יראו את השינויים אוטומטית</div></li>
+  </ol>
+</section>
+
+<!-- ─── SUBJECTS ─── -->
+<section id="subjects">
+  <h1>📚 טאב: ניהול מקצועות</h1>
+  <p>ניהול רשימת המקצועות הזמינים לשיבוץ. כל מקצוע מוגדר עם <strong>שם</strong> ו<strong>סוג שיעור</strong>. בעת עריכת שיעור — ניתן לבחור מקצוע מהרשימה.</p>
+
+  <h2>➕ הוספת מקצוע חדש</h2>
+  <div class="mock">
+    <div class="field-row">
+      <div>
+        <label class="field-label">מקצוע:</label>
+        <div class="field-mock">עברית</div>
+      </div>
+      <div>
+        <label class="field-label">סוג שיעור:</label>
+        <div class="field-mock">סינכרוני ▾</div>
+      </div>
+      <span class="btn-mock green">+ הוסף מקצוע</span>
+    </div>
+  </div>
+  <ol class="steps">
+    <li><div class="text">הקלד את שם המקצוע בשדה "מקצוע" (לדוג': עברית, מתמטיקה)</div></li>
+    <li><div class="text">בחר סוג שיעור: סינכרוני / אסינכרוני / ZOOM/MEET / אחר</div></li>
+    <li><div class="text">לחץ <strong>"+ הוסף מקצוע"</strong> — או הקש <kbd class="kbd">Enter</kbd></div></li>
+  </ol>
+
+  <h2>✏️ עריכת מקצוע קיים</h2>
+  <p>לחץ על כפתור "✏️ ערוך" בשורת המקצוע. הטופס יתמלא בנתונים הקיימים — ערוך ולחץ "✓ שמור שינויים".</p>
+
+  <h2>🗑️ מחיקת מקצוע</h2>
+  <p>לחץ על כפתור "✕ מחק" — המקצוע יוסר מהרשימה. <strong>שיעורים קיימים שכבר שובצו עם מקצוע זה לא יושפעו.</strong></p>
+
+  <h2>🔗 קשר למערכת השעות</h2>
+  <div class="info"><span class="icon">💡</span><div>כשפותחים חלון עריכת שיעור — ניתן לבחור מקצוע מהרשימה הזו. בחירת מקצוע <strong>ממלאת אוטומטית</strong> את שדה "סוג שיעור" לפי ההגדרה בטאב זה.</div></div>
+</section>
+
+<hr class="section-line">
+
+<!-- ─── MULTI USER ─── -->
+<section id="multiuser">
+  <h1>👫 עבודה מרובת משתמשים</h1>
+  <p>המערכת תוכננה לעבודה מקבילה של מספר משתמשים בו-זמנית. הנה כיצד לעבוד נכון כדי להימנע מאיבוד מידע.</p>
+
+  <h2>✅ כללי הזהב</h2>
+  <div class="tip">
+    <span class="icon">1️⃣</span>
+    <div><strong>המתן 1-2 שניות לאחר כל שינוי</strong> לפני ביצוע שינוי הבא. המערכת שומרת תוך 0.4 שניות — קצת המתנה מבטיחה שמירה מוצלחת לענן.</div>
+  </div>
+  <div class="tip">
+    <span class="icon">2️⃣</span>
+    <div><strong>אל תערוך את אותו שיעור בו-זמנית עם מישהו אחר.</strong> אם שני משתמשים עורכים את אותו שיעור בדיוק באותו רגע — ייתכן שרק אחד ישמר.</div>
+  </div>
+  <div class="tip">
+    <span class="icon">3️⃣</span>
+    <div><strong>וודא שהמחוון ירוק (🟢 מחובר לענן)</strong> לפני ביצוע שינויים חשובים. אם אדום — אין חיבור לאינטרנט.</div>
+  </div>
+  <div class="tip">
+    <span class="icon">4️⃣</span>
+    <div>אם נראה שהמסך לא מתעדכן — לחץ <strong>"🔄 רענן הכל"</strong> לריענון ידני.</div>
+  </div>
+
+  <h2>⏱️ תרחישים נפוצים</h2>
+
+  <h3>תרחיש א: שני משתמשים עורכים שיעורים שונים</h3>
+  <p>✅ בטוח לחלוטין — כל אחד עורך שיעורים אחרים, שניהם יישמרו ויסונכרנו.</p>
+
+  <h3>תרחיש ב: משתמש עורך, משתמש שני צופה</h3>
+  <p>✅ בטוח — המשתמש השני יראה את השינויים אוטומטית תוך שניות.</p>
+
+  <h3>תרחיש ג: שני משתמשים עורכים את אותו שיעור בו-זמנית</h3>
+  <p>⚠️ <strong>Last-write-wins</strong> — מי שמשמור אחרון גובר. מומלץ לתאם.</p>
+
+  <h3>תרחיש ד: עריכה ורענון מהיר של הדף</h3>
+  <p>✅ בטוח — המערכת שומרת ב-localStorage מיד, ואם רענון מהיר מדי, היא תדחוף את הנתונים ל-Firebase בטעינת הדף הבאה.</p>
+</section>
+
+<!-- ─── SAFETY ─── -->
+<section id="safety">
+  <h1>🛡️ שמירה בטוחה — מה לעשות ומה לא</h1>
+
+  <h2>✅ מה לעשות</h2>
+  <ul>
+    <li>בדוק שהמחוון ירוק לפני שינויים חשובים</li>
+    <li>המתן שניה-שתיים אחרי שינויים לפני סגירת הדפדפן</li>
+    <li>השתמש ב-<strong>"🔄 רענן הכל"</strong> אחרי שמישהו אחר ביצע עדכונים</li>
+    <li>לאחר שינוי שם מורה — לחץ <strong>"עדכן נתונים"</strong></li>
+    <li>ייצא לאקסל מדי פעם כגיבוי</li>
+  </ul>
+
+  <h2>❌ מה לא לעשות</h2>
+  <ul>
+    <li>אל תסגור את הדפדפן מיד אחרי שינוי — המתן שניה אחת</li>
+    <li>אל תלחץ "🔄 איפוס לברירת מחדל" בטאב ניהול מורים אלא אם בטוח שרוצה לאבד את כל הנתונים</li>
+    <li>אל תעבוד כשהמחוון אדום (🔴 מנותק) — שינויים לא יגיעו לאחרים</li>
+    <li>אל תפתח שני דפדפנים עם <strong>אותו חשבון</strong> ותעשה שינויים בשניהם בו-זמנית</li>
+  </ul>
+
+  <div class="danger">
+    <span class="icon">🚨</span>
+    <div><strong>חשוב מאוד:</strong> שיעורים אסינכרוניים (צהובים) <strong>אינם ניתנים לעריכת מורה</strong> — אין להם מורה משובץ. כדי לשבץ מורה לשיעור אסינכרוני, שנה את סוג השיעור ל"סינכרוני" או "ZOOM/MEET" תחילה.</div>
+  </div>
+</section>
+
+<!-- ─── FAQ ─── -->
+<section id="faq">
+  <h1>❓ שאלות נפוצות</h1>
+
+  <h3>ש: ביצעתי שינוי אך משתמש אחר לא רואה אותו. מה לעשות?</h3>
+  <p>ת: ודא שהמחוון ירוק (🟢). אם כן — לחץ <strong>"🔄 רענן הכל"</strong> אצל המשתמש השני. אם המחוון אדום — יש בעיית חיבור.</p>
+
+  <h3>ש: לא נפתח חלון עריכה כשלחצתי ✏</h3>
+  <p>ת: ודא שהפעלת <strong>מצב עריכה</strong> (הכפתור "✏️ מצב עריכה" צריך להיות כתום ופעיל). שיעורים אסינכרוניים אינם ניתנים לעריכה.</p>
+
+  <h3>ש: איך מבטלים שינוי שנעשה בשיעור?</h3>
+  <p>ת: פתח את חלון העריכה של אותו שיעור ולחץ <strong>"↺ בטל שינוי"</strong> — השיעור יחזור למצב המקורי.</p>
+
+  <h3>ש: שיניתי שם מורה אך הוא לא השתנה במערכת</h3>
+  <p>ת: חובה ללחוץ <strong>"🔄 עדכן נתונים"</strong> בתחתית טאב ניהול מורים. ללא לחיצה זו השינוי לא יכנס לתוקף.</p>
+
+  <h3>ש: יש כפילות בטאב כפילויות אך היא מכוונת</h3>
+  <p>ת: לחץ <strong>"✓ התעלם"</strong> על הכפילות הספציפית — היא תסומן כידועה ותוצג בצבע חיוור.</p>
+
+  <h3>ש: איך מוסיפים כיתה חדשה?</h3>
+  <p>ת: הכיתות נגזרות מנתוני המערכת הבסיסיים. לא ניתן להוסיף כיתה מהממשק — יש לפנות למנהל המערכת.</p>
+
+  <h3>ש: האם ניתן לעבוד ללא אינטרנט?</h3>
+  <p>ת: כן — הנתונים נשמרים מקומית. אולם שינויים לא יגיעו לשאר המשתמשים עד שהחיבור יחזור.</p>
+</section>
+
+</main>
+</div>
+
+<script>
+// Highlight active sidebar link on scroll
+const sections=[...document.querySelectorAll('section[id]')];
+const links=[...document.querySelectorAll('#sidebar a')];
+function onScroll(){
+  let current='';
+  sections.forEach(s=>{if(window.scrollY+120>=s.offsetTop)current=s.id;});
+  links.forEach(a=>{a.classList.toggle('active',a.getAttribute('href')==='#'+current);});
+}
+window.addEventListener('scroll',onScroll,{passive:true});
+onScroll();
+</script>
+</body>
+</html>
