@@ -84,6 +84,12 @@ Cross-dissolve של 0.4–0.5 שנ' מה-UGC אל פריים שחור עם סר�
 - אם כלי Higgsfield זמינים: `models_explore(action:'recommend')` → `generate_image_batch` לתמונות הרפרנס → `generate_video_batch` לכל השוטים (16:9, 3–5 שנ') → `jobs_wait`. אשר עלות עם המשתמש/ת לפני שליחה.
 - אחרת: מסור את הפרומפטים מסעיף 3 למשתמש/ת להרצה ב-Kling / Veo / Runway / Sora וקבל את הקבצים.
 
+### מצב "רק תמונות" (המשתמש/ת מצרף/ת תמונות במקום סרטונים)
+לכל תמונה: נתח מה רואים בה ובחר תנועה שמתאימה לה (חוץ/מבנה ← drone push-in / orbit / crane-up; פנים ← dolly-forward / slow pan; אדם ← פעולה טבעית + push-in איטי; מים/צמחייה ← תנועה טבעית). כתוב פרומפט תנועה בלבד — לא לתאר מחדש את התמונה, ו"keep the scene, architecture and faces exactly as in the image".
+- image-to-video עם התמונה כ-`start_image`, ‏16:9, `duration: 3`, `sound: off` (Kling 3.0 / Cinema Studio Video תומכים ב-3 שנ'; מודל שמינימום שלו 5 — לחתוך ב-ffmpeg ל-3).
+- הצג לפני השליחה טבלה: תמונה ← תנועה שנבחרה ← עלות, וחכה לאישור.
+- חלופה ללא קרדיטים: Ken Burns / פרלקסה ב-Remotion או `zoompan` ב-ffmpeg (זום/פאן איטי בלבד, בלי תנועה אמיתית בתוך הסצנה).
+
 ### הרכבה — Remotion (ברירת מחדל)
 אם קיים הסקיל `hebrew-reels-motion` — השתמש בתשתית שלו (Remotion, גופנים עבריים, RTL). מבנה קומפוזיציה:
 ```
